@@ -56,11 +56,18 @@ SLOT_TEMPLATES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("en_not_arrived",    re.compile(r"^The (.+) hasn.?t arrived yet\. Can you check\?$")),
 )
 
-# No-slot templates and the category they map to directly.
-NO_SLOT_TEMPLATES: dict[str, str] = {
-    "I can’t log in. It says account locked.": "auth_login",
-    "I can't log in. It says account locked.": "auth_login",
-}
+# Known no-slot opening templates. Membership-only set: the category each
+# template maps to comes from the YAML's ``no_slot_template_categories``,
+# which the LLM populates and which is the authoritative source of truth.
+# We deliberately do NOT hardcode the category id here — the LLM may legitimately
+# choose a different id (e.g. ``account_auth`` vs ``auth_login``) and the YAML
+# is what downstream code must agree with.
+NO_SLOT_TEMPLATES: frozenset[str] = frozenset(
+    {
+        "I can’t log in. It says account locked.",  # curly apostrophe (data form)
+        "I can't log in. It says account locked.",  # ASCII apostrophe (YAML form)
+    }
+)
 
 
 def extract_slot(prefix: str) -> tuple[str | None, str | None]:
@@ -95,10 +102,20 @@ class Taxonomy:
     no_slot_template_categories: dict[str, str] = field(default_factory=dict)
 
     def topic_for(self, prefix: str) -> str | None:
-        """Resolve a customer opening prefix to a category id."""
+        """Resolve a customer opening prefix to a category id.
+
+        Looks up the YAML's ``no_slot_template_categories`` (authoritative)
+        with apostrophe-normalisation: the YAML may serialise keys with an
+        ASCII apostrophe while the live dataset uses the curly form, so we
+        try both before giving up.
+        """
         slot, tpl_id = extract_slot(prefix)
         if tpl_id == "<no_slot>":
-            return NO_SLOT_TEMPLATES.get(prefix)
+            return (
+                self.no_slot_template_categories.get(prefix)
+                or self.no_slot_template_categories.get(prefix.replace("’", "'"))
+                or self.no_slot_template_categories.get(prefix.replace("'", "’"))
+            )
         if slot is None:
             return None
         return self.slot_to_category.get(slot)
