@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend.config import Config  # noqa: E402
 from backend.db import connect, init_schema, transaction  # noqa: E402
 from backend.text import clean_prefix  # noqa: E402
+from backend import taxonomy as tax  # noqa: E402
 
 STAGES = ["ingest_raw", "taxonomy", "classify", "rollups", "embed"]
 
@@ -104,8 +105,73 @@ def _flush_turns(conn, batch: list[tuple]) -> None:
 # ---------------------------------------------------------------------------
 # Later stages (stubs — filled in by follow-up tasks)
 # ---------------------------------------------------------------------------
-def stage_taxonomy(cfg: Config, **_: object) -> None:
-    print("[taxonomy] not yet implemented — task #3")
+def stage_taxonomy(cfg: Config, *, force: bool = False, **_: object) -> None:
+    """Derive the closed-set topic taxonomy and persist as YAML.
+
+    Idempotent: if ``data/topic_taxonomy.yaml`` exists and ``--force`` is not
+    set, this is a no-op. Re-running classification therefore uses a stable
+    label set unless the file is deliberately regenerated.
+    """
+    out_path = cfg.data_dir / "topic_taxonomy.yaml"
+    if out_path.exists() and not force:
+        existing = tax.load(out_path)
+        print(
+            f"[taxonomy] skipping — {out_path} already exists with "
+            f"{len(existing.categories)} categories and "
+            f"{len(existing.slot_to_category)} slot mappings (use --force to regen)"
+        )
+        return
+
+    # Pull deterministic slot values from the ingested turns.
+    with connect(cfg.sqlite_path) as conn:
+        prefixes = [
+            r[0]
+            for r in conn.execute(
+                "SELECT DISTINCT text_clean FROM turns "
+                "WHERE role='customer' AND turn_index=0"
+            )
+        ]
+    if not prefixes:
+        raise RuntimeError("[taxonomy] no customer-opening turns in DB — run ingest_raw first")
+
+    slots: set[str] = set()
+    unmatched: list[str] = []
+    for p in prefixes:
+        slot, tpl = tax.extract_slot(p)
+        if slot is not None:
+            slots.add(slot)
+        elif tpl != "<no_slot>":
+            unmatched.append(p)
+    if unmatched:
+        # Don't silently lose prefixes; surface them so the regex bank can be updated.
+        print(
+            f"[taxonomy] WARNING: {len(unmatched)} opening prefixes did not match any "
+            f"template — first few: {unmatched[:3]}"
+        )
+
+    print(
+        f"[taxonomy] {len(prefixes)} distinct openers → {len(slots)} distinct slot "
+        f"values. Asking {cfg.planner_model} to group them…"
+    )
+
+    # Lazy import so the script still imports cleanly when anthropic is unused.
+    from anthropic import Anthropic
+
+    client = Anthropic(api_key=cfg.require_api_key())
+    taxonomy = tax.derive_taxonomy_with_llm(
+        sorted(slots),
+        client,
+        model=cfg.planner_model,
+    )
+    tax.save(taxonomy, out_path)
+    print(
+        f"[taxonomy] wrote {out_path} — {len(taxonomy.categories)} categories, "
+        f"{len(taxonomy.slot_to_category)} slot mappings"
+    )
+    print("[taxonomy] categories:")
+    for c in taxonomy.categories:
+        n_slots = sum(1 for v in taxonomy.slot_to_category.values() if v == c.id)
+        print(f"  - {c.id:30s} ({n_slots:2d} slots)  {c.label}")
 
 
 def stage_classify(cfg: Config, *, limit: int | None = None, **_: object) -> None:
