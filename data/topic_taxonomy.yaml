@@ -1,0 +1,112 @@
+categories:
+- id: telecom_plans
+  label: Telecom Plans & Packs
+  description: Issues related to mobile data packs, 4G/5G upgrades, international/roaming
+    plans, and SIM management.
+- id: broadband_connectivity
+  label: Broadband & Connectivity
+  description: Issues related to home or office broadband services, connection quality,
+    and setup.
+- id: telecom_number_management
+  label: Number & SIM Management
+  description: Issues related to porting numbers, eSIM activation, and SIM-related
+    changes.
+- id: payments_wallet
+  label: Payments & Wallet
+  description: Issues related to digital wallet, UPI transactions, FASTag, and payment
+    failures.
+- id: billing_refunds
+  label: Billing & Refunds
+  description: Issues related to invoices, billing disputes, refunds, and credit card
+    charges.
+- id: financial_products
+  label: Financial Products
+  description: Issues related to loans, mutual funds, savings accounts, and insurance
+    products.
+- id: insurance_claims
+  label: Insurance & Claims
+  description: Issues related to filing, tracking, or resolving insurance claims.
+- id: orders_delivery
+  label: Orders & Delivery
+  description: Issues related to placing orders, delivery status, returns, and exchanges.
+- id: promotions_vouchers
+  label: Promotions & Vouchers
+  description: Issues related to coupons, promo codes, gift cards, vouchers, and partner
+    offers.
+- id: membership_subscription
+  label: Membership & Subscription
+  description: Issues related to subscription plans, membership tiers, and prime or
+    priority delivery benefits.
+- id: travel_transport
+  label: Travel & Transport
+  description: Issues related to booking or managing flights, hotels, buses, and cab
+    rides.
+- id: healthcare_services
+  label: Healthcare Services
+  description: Issues related to teleconsultations, prescriptions, lab tests, and
+    medical appointments.
+- id: learning_education
+  label: Learning & Education
+  description: Issues related to courses, assignments, exams, mock tests, certificates,
+    and career tracks.
+- id: developer_platform
+  label: Developer & Platform
+  description: Issues related to APIs, webhooks, analytics, audit logs, reports, and
+    workspace configuration.
+- id: account_auth
+  label: Account & Authentication
+  description: Issues related to login, account access, SSO, and account lockouts.
+slot_to_category:
+  4G Pack: telecom_plans
+  5G Upgrade: telecom_plans
+  API: developer_platform
+  Analytics: developer_platform
+  Appointment: healthcare_services
+  Assignment: learning_education
+  Audit Logs: developer_platform
+  Billing: billing_refunds
+  Broadband: broadband_connectivity
+  Bus: travel_transport
+  Cab: travel_transport
+  Career Track: learning_education
+  Certificate: learning_education
+  Coupon: promotions_vouchers
+  Course: learning_education
+  Credit Card: billing_refunds
+  Exam: learning_education
+  Exchange: orders_delivery
+  FASTag: payments_wallet
+  Flight: travel_transport
+  Gift Card: promotions_vouchers
+  Hotel: travel_transport
+  Insurance: financial_products
+  Insurance Claim: insurance_claims
+  International Pack: telecom_plans
+  Lab Test: healthcare_services
+  Loan: financial_products
+  Membership: membership_subscription
+  Mock Test: learning_education
+  Mutual Fund: financial_products
+  Order: orders_delivery
+  Partner Offer: promotions_vouchers
+  Porting: telecom_number_management
+  Prescription: healthcare_services
+  Prime Delivery: orders_delivery
+  Priority Delivery: orders_delivery
+  Promo: promotions_vouchers
+  Refund: billing_refunds
+  Report: developer_platform
+  Return: orders_delivery
+  Roaming: telecom_plans
+  SSO: account_auth
+  Savings: financial_products
+  Subscription: membership_subscription
+  Teleconsult: healthcare_services
+  UPI: payments_wallet
+  Voucher: promotions_vouchers
+  Wallet: payments_wallet
+  Webhooks: developer_platform
+  Workspace: developer_platform
+  eSIM: telecom_number_management
+no_slot_template_categories:
+  I can't log in. It says account locked.: account_auth

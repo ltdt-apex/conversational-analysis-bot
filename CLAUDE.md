@@ -162,3 +162,17 @@ last-resort, not a default.
 - Per-turn timestamps are unreliable; never use them for conversation-level time bucketing. Use `conversation_start_ts`.
 - Before merging any change: re-read this file's "Pre-flight checklist" and verify nothing regressed.
 - Every feature touching text must respect the "Bilingual data handling" rules above.
+
+## Future improvements (note for the report's "Next improvements" section)
+
+- **Generalise topic-slot extraction.** Current `backend/taxonomy.py` uses
+  regex templates fitted to the Syncora.ai synthetic data (8 templates ×
+  51 slot values, 100% coverage on the shipped CSV). On real, free-form
+  customer openings this would not generalise. Plug-in points already exist
+  behind `extract_slot()`; the candidate replacements are:
+  - LLM-based slot identification (Claude reads each opener and emits the
+    topic mention), or
+  - Embedding-cluster-then-label (multilingual embeddings + HDBSCAN +
+    LLM cluster labelling).
+  Either approach drops in without touching downstream rollups, RAG, or
+  the agent loop.
