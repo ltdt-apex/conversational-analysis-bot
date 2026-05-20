@@ -174,8 +174,111 @@ def stage_taxonomy(cfg: Config, *, force: bool = False, **_: object) -> None:
         print(f"  - {c.id:30s} ({n_slots:2d} slots)  {c.label}")
 
 
-def stage_classify(cfg: Config, *, limit: int | None = None, **_: object) -> None:
-    print("[classify] not yet implemented — task #4")
+def stage_classify(
+    cfg: Config, *, force: bool = False, limit: int | None = None, **_: object
+) -> None:
+    """Classify each distinct cleaned prefix and join results back onto turns.
+
+    Resumable: rows already in ``prefix_classifications`` are skipped unless
+    ``--force`` is set. After classification the side-table is JOIN-back-copied
+    onto the ``turns`` table so downstream rollups can avoid joins.
+    """
+    from backend import classifier  # lazy — keeps anthropic out of import path otherwise
+
+    with connect(cfg.sqlite_path) as conn:
+        init_schema(conn)
+        if force:
+            print("[classify] --force: truncating prefix_classifications")
+            conn.execute("DELETE FROM prefix_classifications")
+
+        # Discover (text_clean, role) pairs that still need classification.
+        rows = list(
+            conn.execute(
+                """
+                SELECT DISTINCT t.text_clean, t.role
+                FROM turns t
+                LEFT JOIN prefix_classifications p USING (text_clean)
+                WHERE p.text_clean IS NULL
+                """
+            )
+        )
+        pending = [classifier.PrefixInput(text_clean=r[0], role=r[1]) for r in rows]
+        if limit is not None:
+            pending = pending[:limit]
+
+        done = conn.execute("SELECT COUNT(*) FROM prefix_classifications").fetchone()[0]
+        if not pending:
+            print(
+                f"[classify] skipping — all {done} distinct prefixes already classified"
+            )
+        else:
+            print(
+                f"[classify] {len(pending)} prefixes pending ({done} already done). "
+                f"Using model={cfg.classifier_model} "
+                f"batch_size={cfg.classify_batch_size} concurrency={cfg.classify_concurrency}"
+            )
+            from anthropic import Anthropic
+
+            client = Anthropic(api_key=cfg.require_api_key())
+            results = classifier.classify_all(
+                pending,
+                client,
+                model=cfg.classifier_model,
+                batch_size=cfg.classify_batch_size,
+                concurrency=cfg.classify_concurrency,
+            )
+            _insert_classifications(conn, results)
+            print(
+                f"[classify] inserted {len(results)} new classifications "
+                f"(total now: {conn.execute('SELECT COUNT(*) FROM prefix_classifications').fetchone()[0]})"
+            )
+
+        # Join-back-copy onto the turns table. Idempotent — runs every time.
+        _propagate_to_turns(conn)
+        # Quick sanity readout
+        unc = conn.execute(
+            "SELECT COUNT(*) FROM turns WHERE sentiment_label IS NULL"
+        ).fetchone()[0]
+        print(f"[classify] turns rows still missing classification: {unc:,}")
+
+
+def _insert_classifications(conn, results: list) -> None:
+    with transaction(conn):
+        conn.executemany(
+            """INSERT OR REPLACE INTO prefix_classifications
+               (text_clean, role, sentiment_label, sentiment_score, intent,
+                empathy_signal, is_escalation, contains_pii, language,
+                text_clean_en, classified_at, model)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (
+                    r.text_clean, r.role, r.sentiment_label, r.sentiment_score,
+                    r.intent, r.empathy_signal, r.is_escalation, r.contains_pii,
+                    r.language, r.text_clean_en, r.classified_at, r.model,
+                )
+                for r in results
+            ],
+        )
+
+
+def _propagate_to_turns(conn) -> None:
+    """Copy per-prefix classifications onto every matching turn row."""
+    with transaction(conn):
+        conn.execute(
+            """
+            UPDATE turns
+               SET sentiment_label = (SELECT sentiment_label FROM prefix_classifications p WHERE p.text_clean = turns.text_clean),
+                   sentiment_score = (SELECT sentiment_score FROM prefix_classifications p WHERE p.text_clean = turns.text_clean),
+                   intent          = (SELECT intent          FROM prefix_classifications p WHERE p.text_clean = turns.text_clean),
+                   empathy_signal  = (SELECT empathy_signal  FROM prefix_classifications p WHERE p.text_clean = turns.text_clean),
+                   is_escalation   = (SELECT is_escalation   FROM prefix_classifications p WHERE p.text_clean = turns.text_clean),
+                   contains_pii    = (SELECT contains_pii    FROM prefix_classifications p WHERE p.text_clean = turns.text_clean),
+                   language        = (SELECT language        FROM prefix_classifications p WHERE p.text_clean = turns.text_clean),
+                   text_clean_en   = (SELECT text_clean_en   FROM prefix_classifications p WHERE p.text_clean = turns.text_clean),
+                   classified_at   = (SELECT classified_at   FROM prefix_classifications p WHERE p.text_clean = turns.text_clean)
+             WHERE EXISTS (SELECT 1 FROM prefix_classifications p WHERE p.text_clean = turns.text_clean)
+            """
+        )
 
 
 def stage_rollups(cfg: Config, **_: object) -> None:
