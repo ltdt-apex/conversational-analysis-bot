@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.uv-cache/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Data artifacts (large / regenerable)
+data/processed.db
+data/processed.db-journal
+data/chroma/
+data/checkpoints/
+data/topic_taxonomy.yaml.bak
+
+# Keep raw dataset out of git (23MB) — README documents how to obtain it
+data/cs_conversations.csv
+
+# Eval outputs
+eval/results/
+
+# Report build artifacts (the final .docx IS committed under report/)
+report/build/
+
+# Office lock files
+.~lock.*
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
