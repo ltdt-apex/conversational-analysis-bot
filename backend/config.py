@@ -42,8 +42,11 @@ class Config:
             raw_csv_path=Path(
                 os.getenv("RAW_CSV_PATH", data_dir / "cs_conversations.csv")
             ).resolve(),
-            classify_batch_size=int(os.getenv("CLASSIFY_BATCH_SIZE", "40")),
-            classify_concurrency=int(os.getenv("CLASSIFY_CONCURRENCY", "4")),
+            # Conservative defaults so we play nice with low-tier Anthropic
+            # rate limits (~10K output tok/min on free tier). Increase
+            # via .env if you have higher-tier limits.
+            classify_batch_size=int(os.getenv("CLASSIFY_BATCH_SIZE", "20")),
+            classify_concurrency=int(os.getenv("CLASSIFY_CONCURRENCY", "1")),
             memory_ttl_hours=int(os.getenv("MEMORY_TTL_HOURS", "24")),
             # Multilingual by default — the dataset contains English + romanized
             # Hindi/Hinglish turns. See CLAUDE.md "Bilingual data handling".

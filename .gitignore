@@ -20,6 +20,8 @@ env/
 # Data artifacts (large / regenerable)
 data/processed.db
 data/processed.db-journal
+data/processed.db-wal
+data/processed.db-shm
 data/chroma/
 data/checkpoints/
 data/topic_taxonomy.yaml.bak

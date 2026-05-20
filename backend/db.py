@@ -66,6 +66,26 @@ CREATE INDEX IF NOT EXISTS conv_topic_idx ON conversations(topic);
 CREATE INDEX IF NOT EXISTS conv_agent_idx ON conversations(agent_name);
 CREATE INDEX IF NOT EXISTS conv_start_idx ON conversations(start_ts);
 
+-- Side table for resumable per-prefix classification. We classify each
+-- distinct cleaned prefix once (~426 rows) instead of once per turn (~42k
+-- rows). After classification completes, columns are JOIN-back-copied onto
+-- the ``turns`` table so downstream rollups can do simple aggregations
+-- without joining.
+CREATE TABLE IF NOT EXISTS prefix_classifications (
+    text_clean        TEXT PRIMARY KEY,
+    role              TEXT NOT NULL,    -- 'customer' | 'agent' (1:1 with text_clean in our data)
+    sentiment_label   TEXT NOT NULL,    -- 'pos' | 'neu' | 'neg'
+    sentiment_score   REAL NOT NULL,    -- in [-1.0, 1.0]
+    intent            TEXT NOT NULL,
+    empathy_signal    TEXT NOT NULL,    -- 'empathetic' | 'neutral' | 'dismissive' | 'na'
+    is_escalation     INTEGER NOT NULL, -- 0/1
+    contains_pii      INTEGER NOT NULL, -- 0/1
+    language          TEXT NOT NULL,    -- 'en' | 'hi' | 'mixed'
+    text_clean_en     TEXT NOT NULL,
+    classified_at     TEXT NOT NULL,
+    model             TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS agents (
     agent_name              TEXT PRIMARY KEY,
     conv_count              INTEGER,
