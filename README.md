@@ -130,7 +130,8 @@ Documented in `.env.example`. The only required variable is
 
 Tracked in the report's final section. High level:
 - Topic taxonomy is closed-set and frozen — new conversation types beyond the
-  pre-derived ~20 labels fall into an `other` bucket.
+  pre-derived 15 labels (in `data/topic_taxonomy.yaml`) fall into an `unknown`
+  bucket.
 - Per-turn timestamps in the source CSV are not monotonic; we use `turn_index`
   for ordering and `min(turn.timestamp)` as the conversation start time.
 - Single-region, single-process deployment; production would move SQLite →
