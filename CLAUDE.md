@@ -54,7 +54,7 @@ The submission must include **both**:
 - The prefix is recoverable by truncating at the **last `.`/`!`/`?`** — gibberish never contains a sentence terminator (verified on a random 25-sample probe and a full-data run yielded 0 empty prefixes).
 - **Only ~426 distinct cleaned prefixes exist across all 41,965 turns** — the dataset is highly templated. Per-turn classification should classify the 426 distinct prefixes once and join back, not run 41,965 separate LLM calls.
 - Per-turn timestamps are **not monotonic** within a conversation. `turn_index` is authoritative for order. Conversation-level timestamp = `min(turn.timestamp)`.
-- Each conversation has a unique `customer_name`. Agents are reused (top agent: 35 conversations).
+- Each conversation has a unique `customer_name`. Agents are almost 1:1 with conversations: 2,974 agents handle exactly 1 conversation, 13 handle 2, none handle 3+ (3,000 conversations ÷ 2,987 distinct agents = 1.004 avg).
 - Customer-opening prefixes embed the topic as a slot, e.g. *"Hello, my **Audit Logs** is not working as expected."*, *"App crash ho rahi hai while using **Flight**."* — topic extraction is template-driven, not free-form NLU.
 - Dataset is multilingual (English + Hindi/Hinglish templates). Classifier prompt must handle both.
 
@@ -75,7 +75,7 @@ Streamlit UI ─► FastAPI /ask ─► Planner agent (Claude Sonnet 4.6, tool-u
 ```
 
 - **Models:** Claude Sonnet 4.6 for planning/synthesis, Claude Haiku 4.5 for batch turn classification.
-- **Topic taxonomy is closed-set** (~20 labels) derived once in a clustering pre-pass and frozen.
+- **Topic taxonomy is closed-set** (15 labels) derived once via a single Claude Sonnet grouping call over the 51 deterministic slot values, persisted to `data/topic_taxonomy.yaml` and frozen. Unrecognised openers fall back to `unknown`.
 - **Memory:** session-scoped SQLite table, 24h TTL, PII-redacted.
 
 ## Required directory layout (target)
