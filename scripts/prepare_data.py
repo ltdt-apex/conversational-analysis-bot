@@ -281,8 +281,9 @@ def _propagate_to_turns(conn) -> None:
         )
 
 
-def stage_rollups(cfg: Config, **_: object) -> None:
-    print("[rollups] not yet implemented — task #5")
+def stage_rollups(cfg: Config, *, force: bool = False, **_: object) -> None:
+    from backend.rollups import run as _run_rollups
+    _run_rollups(cfg, force=force)
 
 
 def stage_embed(cfg: Config, **_: object) -> None:
