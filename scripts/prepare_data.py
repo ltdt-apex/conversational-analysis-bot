@@ -285,8 +285,9 @@ def stage_rollups(cfg: Config, **_: object) -> None:
     print("[rollups] not yet implemented — task #5")
 
 
-def stage_embed(cfg: Config, **_: object) -> None:
-    print("[embed] not yet implemented — task #6")
+def stage_embed(cfg: Config, *, force: bool = False, **_: object) -> None:
+    from backend.embed import run as _run_embed
+    _run_embed(cfg, force=force)
 
 
 STAGE_FNS = {
