@@ -1,0 +1,210 @@
+# Hand-crafted evaluation set for the conversation analysis bot.
+#
+# 15 questions covering:
+#   - all 4 assignment example-question categories
+#   - 5 Hindi / Hinglish queries (1/3 of the set per CLAUDE.md bilingual rule #6)
+#   - aggregation, agent-ranking, trajectory, recurring-concerns, semantic-search,
+#     and a couple of edge cases
+#
+# For each question we capture:
+#   - id, question, category, language
+#   - expected_tools : at least ONE of these tool names should appear in the
+#                      tool_calls trace (verifies the planner picked the right path)
+#   - expected_keywords : substrings (case-insensitive) that should appear in
+#                         the answer text (verifies coverage of the key facts)
+#   - min_evidence : minimum number of evidence items expected (0 for pure
+#                    aggregation answers, 1+ for evidence-seeking questions)
+#   - notes : free-text describing what a good answer looks like
+
+questions:
+  # ---------------------------------------------------------------------------
+  # Aggregation / Q1 family (assignment example #1)
+  # ---------------------------------------------------------------------------
+  - id: q01_top_negative_topics_nov
+    category: aggregation
+    language: en
+    question: |
+      What are the top 5 topics with the most negative customer sentiment in November 2025?
+    expected_tools: [query_conversations]
+    expected_keywords: ["november", "topic"]
+    min_evidence: 0
+    notes: |
+      Should call query_conversations with month='2025-11', group_by=topic,
+      and return a ranked list of 5 topic labels.
+
+  - id: q02_highest_escalation_topic
+    category: aggregation
+    language: en
+    question: |
+      Which topic has the highest escalation rate across the whole dataset?
+    expected_tools: [query_conversations]
+    expected_keywords: ["escalat"]
+    min_evidence: 0
+    notes: |
+      Aggregation with metrics=escalation_rate. Top hit should be one of the
+      operational categories (billing, account_auth, learning_education).
+
+  - id: q03_count_resolved
+    category: aggregation
+    language: en
+    question: |
+      How many conversations were marked resolved versus unresolved?
+    expected_tools: [query_conversations]
+    expected_keywords: ["resolv"]
+    min_evidence: 0
+
+  # ---------------------------------------------------------------------------
+  # Agent ranking / Q2 family (assignment example #2)
+  # ---------------------------------------------------------------------------
+  - id: q04_agents_low_empathy
+    category: agent_ranking
+    language: en
+    question: |
+      Which support agents may benefit from coaching on empathy or customer
+      communication, with concrete evidence?
+    expected_tools: [query_agents, semantic_search]
+    expected_keywords: ["agent", "empath"]
+    min_evidence: 1
+    notes: |
+      Per saved preference: surface concrete examples, not sample-size caveats.
+      Should name at least one agent and quote one of their turns.
+
+  - id: q05_compare_two_agents
+    category: agent_ranking
+    language: en
+    question: |
+      Compare AgentNWGB and AgentBYTO on resolution rate and empathy.
+    expected_tools: [query_agents]
+    expected_keywords: ["agentnwgb", "agentbyto"]
+    min_evidence: 0
+
+  # ---------------------------------------------------------------------------
+  # Trajectory / Q3 family (assignment example #3)
+  # ---------------------------------------------------------------------------
+  - id: q06_trajectory_specific
+    category: trajectory
+    language: mixed
+    question: |
+      Walk me through how customer sentiment changed across conversation C0009233.
+    expected_tools: [get_trajectory]
+    expected_keywords: ["c0009233", "sentiment"]
+    min_evidence: 1
+    notes: |
+      Should narrate the arc turn-by-turn and quote at least one customer
+      turn from the Hinglish opener.
+
+  - id: q07_trajectory_with_inflection
+    category: trajectory
+    language: en
+    question: |
+      Take conversation C0000053 and describe the inflection points where
+      sentiment changed direction.
+    expected_tools: [get_trajectory]
+    expected_keywords: ["c0000053"]
+    min_evidence: 0
+
+  # ---------------------------------------------------------------------------
+  # Recurring concerns / Q4 family (assignment example #4)
+  # ---------------------------------------------------------------------------
+  - id: q08_leadership_priorities
+    category: recurring_concerns
+    language: en
+    question: |
+      Which recurring customer concerns should leadership review first?
+      Rank by a sensible severity metric and show one concrete example per topic.
+    expected_tools: [query_conversations, semantic_search]
+    expected_keywords: ["concern", "topic"]
+    min_evidence: 1
+
+  - id: q09_unresolved_high_volume
+    category: recurring_concerns
+    language: en
+    question: |
+      Which topics combine high volume with low resolution rate? Those are the
+      ones we should fix first.
+    expected_tools: [query_conversations]
+    expected_keywords: ["resolution", "topic"]
+    min_evidence: 0
+
+  # ---------------------------------------------------------------------------
+  # Semantic search + bilingual (CLAUDE.md bilingual rule #6)
+  # ---------------------------------------------------------------------------
+  - id: q10_hinglish_app_crash
+    category: semantic
+    language: hi
+    question: |
+      Find conversations where Hindi-speaking customers complain about app
+      crashes. Show me one full example.
+    expected_tools: [semantic_search]
+    expected_keywords: ["crash", "app"]
+    min_evidence: 1
+    notes: |
+      Multilingual retrieval test — query is English but should surface
+      Hinglish "App crash ho rahi hai while using X" conversations.
+
+  - id: q11_hindi_query_native
+    category: semantic
+    language: hi
+    question: |
+      Mujhe billing aur refund ki problems ke baare mein conversations dikhao.
+    expected_tools: [semantic_search]
+    expected_keywords: ["refund", "billing"]
+    min_evidence: 1
+    notes: |
+      Query written in Hinglish. The agent should understand and retrieve
+      billing/refund conversations (any language).
+
+  - id: q12_urgency_hindi
+    category: semantic
+    language: hi
+    question: |
+      Show me Hindi conversations where customers express urgency or time pressure.
+    expected_tools: [semantic_search]
+    expected_keywords: ["urgen"]
+    min_evidence: 1
+    notes: |
+      Should retrieve "Thoda jaldi please, flight in 2 hours" or similar
+      urgency-template Hinglish turns.
+
+  - id: q13_frustrated_hindi
+    category: semantic
+    language: hi
+    question: |
+      Aise customers ke conversations dhundo jo unresolved escalations ke baad
+      bahut frustrated hain.
+    expected_tools: [semantic_search]
+    expected_keywords: ["escal", "frustrat"]
+    min_evidence: 1
+    notes: |
+      Romanized Hindi query. Tests that the multilingual retrieval finds
+      escalation+frustration conversations regardless of query language.
+
+  # ---------------------------------------------------------------------------
+  # Edge cases / robustness
+  # ---------------------------------------------------------------------------
+  - id: q14_specific_agent_drilldown
+    category: edge_case
+    language: en
+    question: |
+      Tell me everything you know about AgentTVAX and pull one of their
+      conversations as evidence.
+    expected_tools: [query_agents, get_conversation]
+    expected_keywords: ["agenttvax"]
+    min_evidence: 1
+    notes: |
+      Drill-down test — should hit both query_agents and get_conversation
+      after finding a conv_id for that agent (via semantic_search or
+      query_conversations with agent_name filter).
+
+  - id: q15_low_resolution_billing
+    category: edge_case
+    language: en
+    question: |
+      Find a billing or refund conversation that escalated but was not resolved.
+      Quote the moment things went wrong.
+    expected_tools: [semantic_search]
+    expected_keywords: ["bill", "refund"]
+    min_evidence: 1
+    notes: |
+      Combines a topical filter (billing_refunds) with sentiment/resolution
+      filters and an evidence-quoting requirement.
