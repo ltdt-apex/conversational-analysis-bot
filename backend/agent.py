@@ -1,19 +1,27 @@
 """Planner-Synthesizer agent loop.
 
-Single Anthropic call orchestrates everything: Sonnet picks tools, reads
-their results, decides whether to call more tools or finalise. The final
-answer is emitted via a synthetic ``emit_answer`` tool whose ``input_schema``
-matches :class:`backend.schemas.AnswerEnvelope` — that forces the model to
-return structured JSON rather than free prose.
+One Anthropic call orchestrates everything: Sonnet picks tools, reads their
+results, decides whether to call more tools or finalise. The final answer is
+emitted via a synthetic ``emit_answer`` tool whose ``input_schema`` matches
+:class:`backend.schemas.AnswerEnvelope` — that forces the model to return
+structured JSON rather than free prose.
+
+Read order:
+  * :func:`answer_question`     — public entry point (~10 lines)
+  * :func:`_run_planner_loop`   — the iteration loop (~25 lines)
+  * :func:`_process_tool_uses`  — fan out one turn's tool_use blocks
+  * :func:`_execute_one_tool`   — call one tool, format result for the model
+  * the various ``_wrap_*`` /  ``_*_envelope`` helpers handle the edge cases
+    (no tool_use, max iterations exhausted, force-emit nudge).
 
 Design knobs:
-  - max 8 tool iterations (prevents runaway loops)
-  - tool result payloads truncated when very large (keeps context window
+  * max 8 tool iterations (plus 1 final forced-emit turn — see
+    ``MAX_TOOL_ITERATIONS``)
+  * tool result payloads truncated when very large (keeps context window
     manageable)
-  - the system prompt embeds: the analytical agent's role, the bilingual
+  * the system prompt embeds: the analytical agent's role, the bilingual
     handling contract, the "prefer concrete examples over caveats"
-    preference saved to memory, and a thumbnail of the 15-category
-    taxonomy so the planner doesn't always need to call list_topics
+    preference saved to memory, and a thumbnail of the 15-category taxonomy
 """
 from __future__ import annotations
 
@@ -21,19 +29,183 @@ import json
 from typing import Any
 
 from anthropic import Anthropic
+from pydantic import BaseModel
 
 from backend import memory, tools
 from backend import taxonomy as tax
 from backend.config import Config
-from backend.schemas import (
-    AnswerEnvelope,
-    EvidenceItem,
-    ToolCallTrace,
-)
+from backend.schemas import AnswerEnvelope, EvidenceItem, ToolCallTrace
 
 
 MAX_TOOL_ITERATIONS = 8
-MAX_TOOL_RESULT_CHARS = 8_000  # truncate huge results before showing to the LLM
+MAX_TOOL_RESULT_CHARS = 8_000
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+
+def answer_question(
+    question: str,
+    cfg: Config,
+    *,
+    session_id: str | None = None,
+) -> tuple[str, AnswerEnvelope]:
+    """Run the planner-synthesizer loop and persist the result to session memory.
+
+    Returns ``(session_id, envelope)``. A fresh ``session_id`` is minted when
+    none is supplied so the caller can thread follow-up questions.
+    """
+    session_id = session_id or memory.new_session_id()
+
+    client = Anthropic(api_key=cfg.require_api_key())
+    history = memory.load_recent(cfg, session_id, n=3)
+    messages = _build_messages(question, history)
+    tool_defs = tools.all_definitions() + [_emit_answer_definition()]
+    trace: list[ToolCallTrace] = []
+
+    envelope = _run_planner_loop(client, cfg, messages, tool_defs, trace)
+    memory.save_turn(cfg, session_id, question, envelope)
+    return session_id, envelope
+
+
+# ---------------------------------------------------------------------------
+# The loop
+# ---------------------------------------------------------------------------
+
+
+def _run_planner_loop(
+    client: Anthropic,
+    cfg: Config,
+    messages: list[dict[str, Any]],
+    tool_defs: list[dict[str, Any]],
+    trace: list[ToolCallTrace],
+) -> AnswerEnvelope:
+    """Iterate planner → tool calls until ``emit_answer`` or budget exhausted."""
+    for iteration in range(MAX_TOOL_ITERATIONS + 1):
+        resp = client.messages.create(
+            model=cfg.planner_model,
+            max_tokens=4096,
+            system=_system_prompt(cfg),
+            tools=tool_defs,
+            messages=messages,
+        )
+        tool_uses = [b for b in resp.content if b.type == "tool_use"]
+
+        # Bare prose without any tool_use → wrap whatever the model said.
+        if not tool_uses:
+            return _wrap_bare_prose(resp, trace)
+
+        # The assistant turn (tool_use blocks) must be appended verbatim so the
+        # next round's tool_result blocks can reference the right tool_use ids.
+        messages.append({"role": "assistant", "content": resp.content})
+
+        envelope, tool_results = _process_tool_uses(tool_uses, cfg, trace)
+        if envelope is not None:
+            envelope.tool_calls = trace
+            return envelope
+
+        messages.append({"role": "user", "content": tool_results})
+
+        # One iteration before the cap, nudge the model to call emit_answer
+        # on its next turn.
+        if iteration == MAX_TOOL_ITERATIONS - 1:
+            messages.append(_force_emit_nudge())
+
+    return _exhausted_envelope(trace)
+
+
+def _process_tool_uses(
+    tool_uses: list[Any],
+    cfg: Config,
+    trace: list[ToolCallTrace],
+) -> tuple[AnswerEnvelope | None, list[dict[str, Any]]]:
+    """Run each tool_use block from this turn.
+
+    Returns ``(envelope, tool_results)``:
+      * If one of the blocks is ``emit_answer``, ``envelope`` is the
+        validated :class:`AnswerEnvelope` and we stop processing this turn.
+      * Otherwise ``envelope`` is None and ``tool_results`` holds the
+        ``tool_result`` blocks the caller should feed back into the next turn.
+    """
+    tool_results: list[dict[str, Any]] = []
+    for tu in tool_uses:
+        if tu.name == "emit_answer":
+            return AnswerEnvelope.model_validate(tu.input), tool_results
+
+        payload, summary = _execute_one_tool(tu, cfg)
+        trace.append(
+            ToolCallTrace(
+                tool=tu.name,
+                arguments=dict(tu.input or {}),
+                result_summary=summary,
+            )
+        )
+        tool_results.append(
+            {
+                "type": "tool_result",
+                "tool_use_id": tu.id,
+                "content": payload,
+            }
+        )
+    return None, tool_results
+
+
+def _execute_one_tool(tu: Any, cfg: Config) -> tuple[str, str]:
+    """Call one tool. Returns ``(json_payload_for_model, trace_summary)``.
+
+    Tool errors are intentionally surfaced to the model rather than raised —
+    the planner can recover by trying a different tool or arguments.
+    """
+    try:
+        result = tools.call(tu.name, tu.input or {}, cfg)
+        return _serialise_tool_result(result), _summarise_for_trace(result)
+    except Exception as e:  # noqa: BLE001 — tool errors must be visible to the model
+        return (
+            json.dumps({"error": f"{type(e).__name__}: {e}"}),
+            f"ERROR: {e}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Envelope helpers — these handle the loop's three terminal states
+# ---------------------------------------------------------------------------
+
+
+def _wrap_bare_prose(resp: Any, trace: list[ToolCallTrace]) -> AnswerEnvelope:
+    """The model returned prose without calling any tool — surface it anyway."""
+    prose = "".join(b.text for b in resp.content if b.type == "text").strip()
+    return AnswerEnvelope(
+        answer=prose or "I couldn't gather enough data to answer.",
+        evidence=[],
+        tool_calls=trace,
+        reasoning_brief="Model returned prose without calling emit_answer.",
+        uncertainty="The agent loop did not produce a structured answer.",
+    )
+
+
+def _force_emit_nudge() -> dict[str, Any]:
+    """One-shot reminder appended just before the final iteration."""
+    return {
+        "role": "user",
+        "content": (
+            "You have reached the maximum number of tool calls. "
+            "Call emit_answer NOW with whatever data you have. "
+            "Note any limitations in the `uncertainty` field."
+        ),
+    }
+
+
+def _exhausted_envelope(trace: list[ToolCallTrace]) -> AnswerEnvelope:
+    """The loop ran its full budget without the model ever calling emit_answer."""
+    return AnswerEnvelope(
+        answer="The agent loop exhausted its iteration budget without producing an answer.",
+        evidence=[],
+        tool_calls=trace,
+        reasoning_brief="Iteration cap reached without emit_answer.",
+        uncertainty="Increase MAX_TOOL_ITERATIONS or simplify the question.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +214,7 @@ MAX_TOOL_RESULT_CHARS = 8_000  # truncate huge results before showing to the LLM
 
 
 def _emit_answer_definition() -> dict[str, Any]:
-    """The tool the model calls to deliver its final structured answer."""
+    """The synthetic tool the model calls to deliver its final structured answer."""
     return {
         "name": "emit_answer",
         "description": (
@@ -114,32 +286,33 @@ ANSWER STYLE:
 
 
 # ---------------------------------------------------------------------------
-# Conversation context
+# Message + tool-result formatting
 # ---------------------------------------------------------------------------
 
 
 def _build_messages(
     question: str, history: list[tuple[str, AnswerEnvelope]]
 ) -> list[dict[str, Any]]:
-    """Prepend recent session history as alternating user/assistant turns."""
+    """Prepend recent session history as alternating user/assistant turns.
+
+    We pass only the prose answer for prior assistant turns — the structured
+    evidence / tool-call fields are useful to the human caller but bloat the
+    conversation context for the model.
+    """
     msgs: list[dict[str, Any]] = []
     for prior_q, prior_env in history:
         msgs.append({"role": "user", "content": prior_q})
-        # The assistant's prior turn is just the answer text — the structured
-        # fields are useful to the human caller but bloat the conversation.
         msgs.append({"role": "assistant", "content": prior_env.answer})
     msgs.append({"role": "user", "content": question})
     return msgs
 
 
-# ---------------------------------------------------------------------------
-# Tool result formatting
-# ---------------------------------------------------------------------------
-
-
 def _serialise_tool_result(result: Any) -> str:
-    """Convert tool output to a compact JSON string for the LLM."""
-    from pydantic import BaseModel
+    """Convert a Pydantic / list / dict tool result to compact JSON for the LLM.
+
+    Oversized payloads are truncated with a length marker so the context window
+    stays predictable even on accidentally-large queries.
+    """
 
     def _coerce(obj: Any) -> Any:
         if isinstance(obj, BaseModel):
@@ -157,11 +330,9 @@ def _serialise_tool_result(result: Any) -> str:
 
 
 def _summarise_for_trace(result: Any) -> str:
-    """Short human-readable summary stored in the response envelope."""
+    """Short human-readable summary stored in the response envelope's trace."""
     if isinstance(result, list):
         return f"{len(result)} row(s)"
-    from pydantic import BaseModel
-
     if isinstance(result, BaseModel):
         name = type(result).__name__
         if hasattr(result, "conv_id"):
@@ -170,124 +341,5 @@ def _summarise_for_trace(result: Any) -> str:
     return str(result)[:120]
 
 
-# ---------------------------------------------------------------------------
-# The loop
-# ---------------------------------------------------------------------------
-
-
-def answer_question(
-    question: str,
-    cfg: Config,
-    *,
-    session_id: str | None = None,
-) -> tuple[str, AnswerEnvelope]:
-    """Run the planner-synthesizer loop. Returns (session_id, envelope)."""
-    if not session_id:
-        session_id = memory.new_session_id()
-
-    client = Anthropic(api_key=cfg.require_api_key())
-    history = memory.load_recent(cfg, session_id, n=3)
-    messages = _build_messages(question, history)
-    tool_defs = tools.all_definitions() + [_emit_answer_definition()]
-    trace: list[ToolCallTrace] = []
-
-    final_envelope: AnswerEnvelope | None = None
-
-    for iteration in range(MAX_TOOL_ITERATIONS + 1):
-        resp = client.messages.create(
-            model=cfg.planner_model,
-            max_tokens=4096,
-            system=_system_prompt(cfg),
-            tools=tool_defs,
-            messages=messages,
-        )
-
-        # Collect any tool uses from this turn.
-        tool_uses: list[Any] = [b for b in resp.content if b.type == "tool_use"]
-
-        # No tool use → the model returned prose without calling emit_answer.
-        # That's a model failure; we wrap whatever it said.
-        if not tool_uses:
-            prose = "".join(b.text for b in resp.content if b.type == "text").strip()
-            final_envelope = AnswerEnvelope(
-                answer=prose or "I couldn't gather enough data to answer.",
-                evidence=[],
-                tool_calls=trace,
-                reasoning_brief="Model returned prose without calling emit_answer.",
-                uncertainty="The agent loop did not produce a structured answer.",
-            )
-            break
-
-        # Append the assistant turn verbatim so the next round of tool_result
-        # blocks line up with the tool_use ids.
-        messages.append({"role": "assistant", "content": resp.content})
-
-        tool_results: list[dict[str, Any]] = []
-        emitted = False
-        for tu in tool_uses:
-            if tu.name == "emit_answer":
-                final_envelope = AnswerEnvelope.model_validate(tu.input)
-                final_envelope.tool_calls = trace
-                emitted = True
-                break
-            try:
-                result = tools.call(tu.name, tu.input or {}, cfg)
-                payload = _serialise_tool_result(result)
-                summary = _summarise_for_trace(result)
-                trace.append(
-                    ToolCallTrace(
-                        tool=tu.name,
-                        arguments=dict(tu.input or {}),
-                        result_summary=summary,
-                    )
-                )
-            except Exception as e:  # noqa: BLE001 — tool errors must be visible to the model
-                payload = json.dumps({"error": f"{type(e).__name__}: {e}"})
-                trace.append(
-                    ToolCallTrace(
-                        tool=tu.name,
-                        arguments=dict(tu.input or {}),
-                        result_summary=f"ERROR: {e}",
-                    )
-                )
-            tool_results.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": tu.id,
-                    "content": payload,
-                }
-            )
-        if emitted:
-            break
-        messages.append({"role": "user", "content": tool_results})
-
-        # Hard cap: if we've hit max iterations without emit_answer, force one
-        # last turn where the model MUST emit. We re-issue with a nudge.
-        if iteration == MAX_TOOL_ITERATIONS - 1:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        "You have reached the maximum number of tool calls. "
-                        "Call emit_answer NOW with whatever data you have. "
-                        "Note any limitations in the `uncertainty` field."
-                    ),
-                }
-            )
-
-    if final_envelope is None:
-        final_envelope = AnswerEnvelope(
-            answer="The agent loop exhausted its iteration budget without producing an answer.",
-            evidence=[],
-            tool_calls=trace,
-            reasoning_brief="Iteration cap reached without emit_answer.",
-            uncertainty="Increase MAX_TOOL_ITERATIONS or simplify the question.",
-        )
-
-    # Persist to session memory for follow-ups.
-    memory.save_turn(cfg, session_id, question, final_envelope)
-    return session_id, final_envelope
-
-
-# Compatibility shim — keeps the EvidenceItem name re-exported for FastAPI.
+# Compatibility shim — re-export EvidenceItem so backend.api can import it from here.
 __all__ = ["answer_question", "AnswerEnvelope", "EvidenceItem"]
