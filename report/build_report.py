@@ -266,13 +266,70 @@ def section_dataset_handling(doc, stats, tax_doc):
 
     H2(doc, "2.3 Topic taxonomy (derived once, frozen)")
     P(doc,
-      "Customer opening turns follow 8 deterministic templates with a single "
-      "topic slot plus 1 no-slot login template. The 51 distinct slot values "
-      "were grouped by Claude Sonnet 4.6 in a single call into 15 canonical "
-      "categories persisted at data/topic_taxonomy.yaml. Re-running the "
-      "preparation pipeline is idempotent against this artifact — downstream "
-      "rollups, embeddings, and the agent's filter arguments all key off "
-      "these stable category ids."
+      "Every conversation starts with a customer message, and those opening "
+      "messages turn out to be extremely templated. Across all 3,000 "
+      "conversations, the first customer turn always follows one of nine "
+      "fixed sentence patterns, with the topic the customer is calling about "
+      "baked directly into the wording. Six concrete examples (the topic word "
+      "is in italics):"
+    )
+    Code(doc,
+        "“Hello, my Audit Logs is not working as expected.”\n"
+        "“Hi, I need help with my SSO.”\n"
+        "“App crash ho rahi hai while using Wallet.”            (Hinglish)\n"
+        "“Mujhe Refund ke baare mein help chahiye.”             (Hinglish)\n"
+        "“I was charged twice for my eSIM.”\n"
+        "“I can’t log in. It says account locked.”"
+    )
+    P(doc,
+      "These nine patterns split into two kinds that are extracted slightly "
+      "differently:"
+    )
+    Bullet(doc,
+      "Eight patterns are PARAMETERISED — each is a fixed sentence with one "
+      "fill-in-the-blank position that takes a product or service name. For "
+      "example, the “Hello, my X is not working” pattern fills X with Audit "
+      "Logs, Wallet, Refund, Flight, eSIM, and 46 other product names. We "
+      "extract the topic by running a small regex per pattern and capturing "
+      "the product name from the blank. The 51 distinct product/service "
+      "names that appear across all 8 patterns become the raw topic vocabulary."
+    )
+    Bullet(doc,
+      "One pattern is NOT parameterised — “I can’t log in. It says account "
+      "locked.” is a fixed verbatim sentence with no fill-in-the-blank. "
+      "Every conversation that opens this way is about the same problem "
+      "(login / account access), so instead of extracting a blank, we "
+      "recognise the whole sentence and tag it directly with the "
+      "account_auth category. This single pattern is the most common "
+      "opener in the dataset — 304 of 3,000 conversations start with it "
+      "verbatim."
+    )
+    P(doc,
+      "Together this gives a deterministic regex bank that classifies 100% "
+      "of the 408 distinct customer openers we observed, with no LLM cost "
+      "and no failure modes at extraction time."
+    )
+    P(doc,
+      "The 51 raw product/service names are then handed to Claude Sonnet 4.6 "
+      "in a single grouping call. The model produces a small canonical "
+      "taxonomy of 15 categories (e.g. payments_wallet, billing_refunds, "
+      "healthcare_services, account_auth, …) along with a mapping from each "
+      "raw product name to its category. The result is persisted as "
+      "data/topic_taxonomy.yaml and treated as immutable — every downstream "
+      "component (per-conversation rollups, ChromaDB metadata, the agent's "
+      "filter arguments) keys off these stable category ids. Re-running the "
+      "preparation pipeline is idempotent against this artifact; "
+      "prepare_data.py --stage taxonomy --force is the only way to regenerate it."
+    )
+    P(doc,
+      "Why this matters as a design choice: because topic extraction is "
+      "mechanical for THIS dataset, we get deterministic, free topic labels "
+      "without spending LLM calls per turn. The trade-off is that the regex "
+      "bank is fitted to Syncora.ai's synthetic templates; on real free-form "
+      "customer support text we would need an LLM-based opener parser "
+      "instead. The plug-in point already exists at "
+      "backend.taxonomy.extract_slot() and Section 9 names two candidate "
+      "replacements."
     )
     rows = []
     for c in tax_doc["categories"]:
