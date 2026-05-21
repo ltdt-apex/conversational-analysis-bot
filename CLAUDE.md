@@ -176,3 +176,64 @@ last-resort, not a default.
     LLM cluster labelling).
   Either approach drops in without touching downstream rollups, RAG, or
   the agent loop.
+
+## Preprocessing-pass optimization backlog (parked — not yet implemented)
+
+Candidate improvements identified during an optimization pass. Each is
+deferred pending a deeper look at the current pipeline behaviour.
+
+### Stage 1 — text cleaning
+- **A1 Cleaning audit.** Verify the wordfreq pass didn't drop legitimate
+  words; current "0 residual gibberish" guarantee is checked at the
+  distinct-prefix level only.
+- **A2 Cleaning throughput.** Single-threaded Python; could batch via polars
+  or parallel workers (only matters if dataset grows >100k turns).
+
+### Stage 2 — topic taxonomy
+- (Already tracked above under "Generalise topic-slot extraction".)
+
+### Stage 3 — per-prefix classifier (highest expected impact)
+- **B3 Sentiment calibration audit.** Hand-label 20-30 random prefixes,
+  compare to Haiku's sentiment. Investigate if neutral is over-fired.
+- **B4 Intent distribution sanity.** `status_update` shows up in 9,693
+  turns (~23% of all turns). Verify with hand-labels whether the classifier
+  is using it as a catch-all for agent responses.
+- **B5 Continuous empathy score.** Replace the 3-bucket
+  empathetic/neutral/dismissive with a `[0, 1]` continuous score so agent
+  ranking has finer resolution. (Dismissive label currently has 0 instances
+  on the synthetic data, wasting one of three buckets.)
+- **B6 Drop the `na` post-coercion.** Simplify the classifier path now that
+  empathy could go continuous.
+
+### Stage 4 — rollups
+- **C7 Resolution heuristic.** Current rule looks at last 2 turns for
+  `resolution_confirmation` or `thanks` from the customer. Could miss cases
+  where the customer's closing turn is a generic acknowledgement after a
+  clear `solution_offer` from the agent. Try: "any of last 3 turns has
+  resolution_confirmation OR thanks AND a solution_offer appeared somewhere
+  in the second half of the conversation".
+- **C8 Empathy mapping.** Hand-picked 1.0/0.5/0.0 mapping is arbitrary;
+  collapses naturally if B5 ships.
+- **C9 Top topics per agent.** Currently capped at 3. With 1.004
+  conversations per agent on average, the cap is mostly a no-op.
+
+### Stage 5 — embedding store
+- **D10 Per-turn vs per-conversation embeddings.** Current is 1 doc per
+  conversation (3,000 docs). Per-turn would yield 41,965 docs and enable
+  "find the exact moment where X happened" retrieval. Larger index, slightly
+  slower search, qualitatively different RAG behaviour.
+- **D11 Parallel English-translation index.** Optional second collection
+  keyed off `text_clean_en` for English-only queries that may benefit from
+  exact-language matching. The current multilingual model already covers this
+  implicitly, so D11 is a tuning lever, not a correctness fix.
+- **D12 Metadata enrichment.** Add `intent_majority`, `has_escalation_turn`,
+  `resolved` to ChromaDB metadata for finer filter support.
+
+### Conversation-level temporal handling (data-shape)
+- **E13 Switch `conversation_start_ts` from `MIN(turn.timestamp)` to
+  `MEDIAN(turn.timestamp)`.** Per-turn timestamps in the source CSV are
+  uniformly random across a ~4-day window per conversation (verified:
+  spans median 86h, p90 93h; correlation with turn_index = 0.000). `MIN`
+  skews toward the earliest random outlier (up to 3 days before centroid);
+  median is the centroid of the noisy window. Affects Q1's exact counts
+  near month boundaries. Worth doing once we accept the eval rerun cost.
