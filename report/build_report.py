@@ -469,6 +469,25 @@ def section_agent_flow(doc):
       "offering escalation paths). Total wall-clock time: 75 seconds."
     )
 
+    H2(doc, "Design choice: single-agent + tool-use")
+    P(doc,
+      "The design is one Sonnet 4.6 call running a tool-use loop with a "
+      "structured-output sink. It qualifies as an agent (autonomous tool "
+      "selection, state-aware iteration, self-termination) and meets the "
+      "assignment's bar of a deliberate workflow rather than a single prompt."
+    )
+    P(doc,
+      "We chose single-agent + tool-use over a multi-agent design "
+      "(orchestrator + specialised sub-agents) because the task does not "
+      "require specialisation: the same model decides which slice of data to "
+      "fetch, reads the result, and writes the synthesis. Keeping that in one "
+      "continuous context preserves reasoning across the 1-11 tool calls a "
+      "single question may need, with no handoff loss between sub-agents and "
+      "without multiplying Anthropic round trips. The natural extension when "
+      "richer agency is justified is a Critic agent — listed as the "
+      "highest-leverage item in Section 9."
+    )
+
 
 def section_models_and_tools(doc):
     H1(doc, "5. Model and tool choices")
@@ -748,6 +767,17 @@ def section_limitations(doc):
 
 def section_next_improvements(doc):
     H1(doc, "9. Next improvements")
+    Bullet(doc,
+      "Add an online Critic agent (highest leverage). Today the system is a "
+      "single-agent + tool-use loop (Section 4). The cheapest upgrade to a "
+      "genuine multi-agent workflow is a post-emit_answer Haiku call that "
+      "reads (question, answer, evidence, tool_calls) and judges grounding "
+      "sufficiency. When grounding is weak the critic emits structured "
+      "feedback — \"the claim about Financial Products lacks supporting "
+      "evidence\" — and the planner runs one more retrieval pass before "
+      "re-emitting. This directly targets the three weakest eval grounding "
+      "scores (q06 0.65, q08 0.75, q09 0.75) at ~$0.005 and ~5s per question."
+    )
     Bullet(doc,
       "Generalise topic extraction. Replace the regex template bank with an "
       "LLM-based slot extractor OR an embedding-cluster-then-label approach "
