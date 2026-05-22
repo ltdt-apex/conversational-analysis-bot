@@ -192,86 +192,59 @@ def section_title(doc):
 def section_problem_framing(doc):
     H1(doc, "1. Problem framing")
     P(doc,
-      "Contact-centre analysts spend hours triaging customer-support transcripts "
-      "to answer recurring analytical questions: which topics drive the most "
-      "negative sentiment, which agents need coaching, how individual "
-      "conversations evolve emotionally, and what recurring concerns deserve "
-      "leadership review. This prototype turns those questions into a single "
-      "chat-style entry point backed by a deliberate agent workflow that "
-      "combines structured aggregations with retrieved conversation evidence."
-    )
-    P(doc,
-      "The system must accept arbitrary analytical questions over a 3,000-"
-      "conversation customer-support dataset and return evidence-based answers "
-      "with rankings, retrieved examples, and brief reasoning. It must handle "
-      "the bilingual nature of the data (English plus romanized Hindi / "
-      "Hinglish) natively, support follow-up questions within a session, and "
-      "emit structured output that downstream consumers (the analyst UI, an "
-      "evaluation harness, future integrations) can parse without "
-      "post-processing."
+      "Build a prototype that lets a contact-centre analyst ask analytical "
+      "questions over 3,000 bilingual (English + Hindi/Hinglish) customer-"
+      "support conversations and get clear, evidence-backed answers in seconds."
     )
     H2(doc, "Success criteria")
-    Bullet(doc, "All four assignment example questions answerable end-to-end via the API and UI.")
-    Bullet(doc, "Answers cite retrieved evidence (verbatim quotes with conv_id) wherever the question implies examples.")
-    Bullet(doc, "Bilingual queries (Hindi/Hinglish in either query or data) succeed without pre-translation.")
-    Bullet(doc, "Reproducible offline pipeline: a clean clone + .env can rebuild every artifact deterministically.")
-    Bullet(doc, "Credentials live in env vars only; the repo contains no real keys.")
+    Bullet(doc, "All four assignment example questions answerable via the chat UI and the API.")
+    Bullet(doc, "Answers cite concrete conversation examples whenever the question implies evidence.")
+    Bullet(doc, "The system shows a deliberate analytical / agent workflow rather than a single direct prompt.")
 
 
 def section_dataset_handling(doc, stats, tax_doc):
-    H1(doc, "2. Dataset handling")
+    H1(doc, "2. Dataset preprocessing")
     P(doc,
       f"Source: Customer Support Conversation Dataset – Syncora.ai (Kaggle), "
-      f"3,000-conversation sample provided as data/cs_conversations.csv. "
+      f"a sample of 3,000 conversations provided as a single CSV. "
       f"Raw shape: {stats['turns']:,} turn rows across "
       f"{stats['conversations']:,} conversations, "
       f"{stats['distinct_agents']:,} distinct agents, dated "
       f"{stats['min_date'][:10]} to {stats['max_date'][:10]}."
     )
-    H2(doc, "2.1 Text cleaning")
+    H2(doc, "2.1 Data cleaning")
     P(doc,
-      "Every turn's raw text is a coherent leading sentence followed by a long "
-      "run of synthetic gibberish tokens. The cleaning pass runs in two stages:"
+      "Each turn in the raw CSV is a short readable sentence followed by a "
+      "long string of random gibberish characters. We strip everything after "
+      "the last sentence-ending punctuation mark, then drop any remaining "
+      "non-word tokens using an English + Hindi dictionary. After cleaning, "
+      f"all {stats['turns']:,} turns are reduced to short readable text — "
+      f"and across the whole dataset there are only "
+      f"{stats['distinct_prefixes']} distinct cleaned sentences, which means "
+      "the data is highly templated. We exploit this in the next step."
     )
-    Bullet(doc,
-      "Sentence-terminator truncation: keep everything up to and including "
-      "the last '.', '!' or '?'. Verified that the synthetic gibberish never "
-      "contains a terminator (full-data run: 0 turns with empty cleaned prefix)."
-    )
-    Bullet(doc,
-      "Wordfreq-based residual scrub: tokens not present in either English "
-      "or Hindi corpora and not on a small domain allowlist (FASTag, "
-      "Teleconsult, eSIM, common Hinglish function words …) are dropped. "
-      "Verified: 0 residual gibberish tokens across all 426 distinct cleaned prefixes."
-    )
+    H2(doc, "2.2 Labels and aggregations we add to each turn")
     P(doc,
-      f"The dataset is highly templated. Across {stats['turns']:,} turns there "
-      f"are only {stats['distinct_prefixes']} distinct cleaned prefixes — "
-      "an observation that drives the deduplication strategy below."
+      "Because there are only ~426 distinct cleaned sentences, we send each "
+      "of those once to a cheap, fast model (Claude Haiku) and ask it to "
+      "label it. The labels are then copied onto every turn that uses the "
+      "same sentence. This is roughly 100× cheaper than labelling each of "
+      "the 42,000 turns individually."
     )
-    H2(doc, "2.2 Derived fields")
-    P(doc,
-      "Each turn gets eleven additional columns produced by a single LLM "
-      "classification call per distinct cleaned prefix (Claude Haiku 4.5, "
-      "JSON-mode output, batched 20 prefixes per request with tenacity-backed "
-      "retry on rate limits). Results are joined back onto all matching turn rows."
-    )
-    Bullet(doc, "sentiment_label (pos / neu / neg) and sentiment_score (–1.0 to +1.0)")
-    Bullet(doc, "intent (12-label closed set: complaint, query, acknowledgement, urgency_request, escalation_request, resolution_confirmation, thanks, apology, solution_offer, status_update, info_request, other)")
-    Bullet(doc, "empathy_signal (empathetic / neutral / dismissive; 'na' for customer turns)")
-    Bullet(doc, "is_escalation, contains_pii (0/1)")
-    Bullet(doc, "language (en / hi / mixed) and text_clean_en (faithful English translation, equals text_clean for English turns)")
-    Bullet(doc, "Per-conversation rollups: topic, customer_sentiment_overall, sentiment_trajectory (JSON), resolution_flag, escalation_flag, agent_empathy_mean")
-    Bullet(doc, "Per-agent rollups: conv_count, avg_customer_sentiment, empathy_mean, resolution_rate, escalation_rate, top_topics")
+    P(doc, "Per-turn labels added:")
+    Bullet(doc, "Sentiment — both a category (positive / neutral / negative) and a score from −1 to +1.")
+    Bullet(doc, "Intent — what the speaker is doing in the turn (complaint, urgency request, escalation request, thanks, apology, solution offer, status update, asking for info, …).")
+    Bullet(doc, "Empathy signal for agent turns (empathetic / neutral / dismissive).")
+    Bullet(doc, "Escalation flag and PII flag.")
+    Bullet(doc, "Language (English / Hindi / mixed) plus a clean English translation of the original line.")
+    P(doc, "We then roll these per-turn labels up to two further levels:")
+    Bullet(doc, "Per-conversation: overall customer sentiment, a turn-by-turn sentiment trajectory, whether the issue was resolved, whether escalation happened, the conversation's topic, and the agent's average empathy.")
+    Bullet(doc, "Per-agent: how many conversations they handled, average customer sentiment, average empathy, resolution rate, escalation rate, and which topics they handle most.")
 
-    H2(doc, "2.3 Topic taxonomy (derived once, frozen)")
+    H2(doc, "2.3 Topic extraction (derived once, frozen)")
     P(doc,
-      "Every conversation starts with a customer message, and those opening "
-      "messages turn out to be extremely templated. Across all 3,000 "
-      "conversations, the first customer turn always follows one of nine "
-      "fixed sentence patterns, with the topic the customer is calling about "
-      "baked directly into the wording. Six concrete examples (the topic word "
-      "is in italics):"
+      "Every conversation opens with a customer message that follows one of "
+      "nine fixed sentence patterns, with the topic baked into the wording:"
     )
     Code(doc,
         "“Hello, my Audit Logs is not working as expected.”\n"
@@ -282,55 +255,14 @@ def section_dataset_handling(doc, stats, tax_doc):
         "“I can’t log in. It says account locked.”"
     )
     P(doc,
-      "These nine patterns split into two kinds that are extracted slightly "
-      "differently:"
-    )
-    Bullet(doc,
-      "Eight patterns are PARAMETERISED — each is a fixed sentence with one "
-      "fill-in-the-blank position that takes a product or service name. For "
-      "example, the “Hello, my X is not working” pattern fills X with Audit "
-      "Logs, Wallet, Refund, Flight, eSIM, and 46 other product names. We "
-      "extract the topic by running a small regex per pattern and capturing "
-      "the product name from the blank. The 51 distinct product/service "
-      "names that appear across all 8 patterns become the raw topic vocabulary."
-    )
-    Bullet(doc,
-      "One pattern is NOT parameterised — “I can’t log in. It says account "
-      "locked.” is a fixed verbatim sentence with no fill-in-the-blank. "
-      "Every conversation that opens this way is about the same problem "
-      "(login / account access), so instead of extracting a blank, we "
-      "recognise the whole sentence and tag it directly with the "
-      "account_auth category. This single pattern is the most common "
-      "opener in the dataset — 304 of 3,000 conversations start with it "
-      "verbatim."
-    )
-    P(doc,
-      "Together this gives a deterministic regex bank that classifies 100% "
-      "of the 408 distinct customer openers we observed, with no LLM cost "
-      "and no failure modes at extraction time."
-    )
-    P(doc,
-      "The 51 raw product/service names are then handed to Claude Sonnet 4.6 "
-      "in a single grouping call. The model produces a small canonical "
-      "taxonomy of 15 categories (e.g. payments_wallet, billing_refunds, "
-      "healthcare_services, account_auth, …) along with a mapping from each "
-      "raw product name to its category. The result is persisted as "
-      "data/topic_taxonomy.yaml and treated as immutable — every downstream "
-      "component (per-conversation rollups, ChromaDB metadata, the agent's "
-      "filter arguments) keys off these stable category ids. Re-running the "
-      "preparation pipeline is idempotent against this artifact; "
-      "prepare_data.py --stage taxonomy --force is the only way to regenerate it."
-    )
-    P(doc,
-      "Why this matters as a design choice: because topic extraction is "
-      "mechanical for THIS dataset, we get deterministic, free topic labels "
-      "without spending LLM calls per turn. The trade-off is that the regex "
-      "bank is fitted to Syncora.ai's synthetic templates; on real free-form "
-      "customer support text we would need an LLM-based opener parser "
-      "instead. The plug-in point already exists at "
-      "backend.preprocessing.taxonomy.extract_slot() and Section 9 names two "
-      "candidate "
-      "replacements."
+      "We extract the product name (the topic) from each opener using a "
+      "small set of patterns, then group the 51 distinct product names into "
+      "15 broader categories (Payments & Wallet, Billing & Refunds, "
+      "Healthcare Services, etc.) using a one-shot LLM grouping call. These "
+      "15 categories are frozen and used as the topic vocabulary throughout "
+      "the rest of the system. The pattern bank is fitted to this dataset; "
+      "a more general LLM-based extractor is the planned replacement "
+      "(Section 8)."
     )
     rows = []
     for c in tax_doc["categories"]:
@@ -368,39 +300,100 @@ def section_dataset_handling(doc, stats, tax_doc):
 def section_system_design(doc):
     H1(doc, "3. System design")
     P(doc,
-      "Two-tier architecture: an offline preparation pipeline produces "
-      "two persistent stores (SQLite for structured rollups, ChromaDB for "
-      "multilingual semantic search), and an online agent loop combines them "
-      "via six narrowly-typed tools to answer analyst questions."
+      "Two clearly separated parts: a preprocessing pipeline that runs once "
+      "offline to turn the raw CSV into labelled, searchable data, and an "
+      "online serving path that uses an AI agent to answer questions over "
+      "that data."
     )
+
+    H2(doc, "3.1 Preprocessing pipeline (offline, one-shot)")
     Code(doc,
-        "CSV ─► prefix_clean ─► per-distinct-prefix Haiku classifier ─► rollups ─► SQLite\n"
-        "                                                                       └► ChromaDB\n"
-        "\n"
-        "Streamlit ─► FastAPI /ask ─► Planner (Sonnet 4.6, tool-use) ─► Synthesizer (emit_answer)\n"
-        "                              tools: query_conversations, query_agents,\n"
-        "                                     semantic_search, get_trajectory,\n"
-        "                                     get_conversation, list_topics"
+        "         ┌────────────────────────────┐\n"
+        "         │  Raw CSV (42k turns)       │\n"
+        "         └─────────────┬──────────────┘\n"
+        "                       ▼\n"
+        "         ┌────────────────────────────┐\n"
+        "         │  Clean each turn's text    │\n"
+        "         │  (strip random gibberish)  │\n"
+        "         └─────────────┬──────────────┘\n"
+        "                       ▼\n"
+        "         ┌────────────────────────────┐\n"
+        "         │  Label each distinct       │\n"
+        "         │  sentence with AI          │\n"
+        "         │  (sentiment, intent,       │\n"
+        "         │   empathy, language, …)    │\n"
+        "         └─────────────┬──────────────┘\n"
+        "                       ▼\n"
+        "         ┌────────────────────────────┐\n"
+        "         │  Roll up to conversation   │\n"
+        "         │  and agent level + extract │\n"
+        "         │  topic per conversation    │\n"
+        "         └─────────────┬──────────────┘\n"
+        "                       │\n"
+        "          ┌────────────┴────────────┐\n"
+        "          ▼                         ▼\n"
+        "   ┌────────────┐           ┌──────────────┐\n"
+        "   │ Structured │           │ Vector store │\n"
+        "   │ database   │           │ (multilingual│\n"
+        "   │ (SQLite)   │           │  embeddings) │\n"
+        "   └────────────┘           └──────────────┘"
     )
-    H2(doc, "Components")
-    Bullet(doc, "scripts/prepare_data.py — staged pipeline (ingest_raw, taxonomy, classify, rollups, embed). Every stage is idempotent and resumable.")
-    Bullet(doc, "backend/preprocessing/ (text.py + taxonomy.py + classifier.py + rollups.py + embed.py) — one file per offline preparation stage; cleanly testable in isolation. Lives in its own subpackage so the offline-vs-serving boundary is explicit at import time.")
-    Bullet(doc, "backend/tools.py — the six tool functions, each with Pydantic input/output schemas. Tool definitions for Anthropic's API are auto-generated from the Pydantic models.")
-    Bullet(doc, "backend/agent.py — single Claude Sonnet 4.6 tool-use loop that emits a structured AnswerEnvelope via a synthetic emit_answer tool.")
-    Bullet(doc, "backend/api.py — FastAPI POST /ask returning AnswerEnvelope; auto-OpenAPI at /docs.")
-    Bullet(doc, "backend/memory.py — session-scoped SQLite memory, 24h TTL, regex PII redaction (emails, phones, cards) before persistence.")
-    Bullet(doc, "ui/app.py — Streamlit chat with evidence cards, sample-question chips, and an expandable tool-call trace.")
-    Bullet(doc, "eval/run_eval.py — 15-question harness with Haiku-as-judge grounding check.")
+    P(doc, "Important pieces (high level):")
+    Bullet(doc, "The data cleaner — strips the synthetic gibberish from each turn.")
+    Bullet(doc, "The labeller — sends each distinct sentence once to a fast AI model and copies the labels onto every matching turn.")
+    Bullet(doc, "The topic extractor — recognises which product / service the customer is calling about, then groups those into a small set of analyst-friendly categories.")
+    Bullet(doc, "The rollups — produce ready-to-query views per conversation and per agent.")
+    Bullet(doc, "The vector-store seeder — embeds each conversation using a multilingual model so semantic search works in both English and Hindi/Hinglish.")
+
+    H2(doc, "3.2 Online serving (per analyst question)")
+    Code(doc,
+        "         ┌────────────────────────────┐\n"
+        "         │  Analyst types a question  │\n"
+        "         │  in the chat UI            │\n"
+        "         └─────────────┬──────────────┘\n"
+        "                       ▼\n"
+        "         ┌────────────────────────────┐\n"
+        "         │  Web API endpoint          │\n"
+        "         │  (receives /ask request)   │\n"
+        "         └─────────────┬──────────────┘\n"
+        "                       ▼\n"
+        "         ┌────────────────────────────┐\n"
+        "         │  AI agent (the planner):   │\n"
+        "         │  decides which tools to    │\n"
+        "         │  call, reads results, and  │\n"
+        "         │  loops until it has enough │\n"
+        "         │  evidence                  │\n"
+        "         └─────────────┬──────────────┘\n"
+        "                       │ uses\n"
+        "                       ▼\n"
+        "         ┌────────────────────────────┐\n"
+        "         │  Six tools: aggregate over │\n"
+        "         │  the database; semantic    │\n"
+        "         │  search the vector store;  │\n"
+        "         │  look up specific          │\n"
+        "         │  conversations or topics   │\n"
+        "         └─────────────┬──────────────┘\n"
+        "                       ▼\n"
+        "         ┌────────────────────────────┐\n"
+        "         │  Structured answer:        │\n"
+        "         │  prose + cited quotes +    │\n"
+        "         │  reasoning + uncertainty   │\n"
+        "         └────────────────────────────┘"
+    )
+    P(doc, "Important pieces (high level):")
+    Bullet(doc, "The chat UI — where the analyst types their question and sees the answer with evidence cards.")
+    Bullet(doc, "The web API — accepts a question, returns the structured answer; can also be called from scripts or other systems.")
+    Bullet(doc, "The agent — the brain that decides what tools to call to answer the question.")
+    Bullet(doc, "The tools — the agent's hands; the six things the agent is allowed to ask the data for.")
+    Bullet(doc, "Session memory — short-term context so follow-up questions can refer back to earlier answers within the same session.")
 
 
 def section_agent_flow(doc):
     H1(doc, "4. Agent flow")
     P(doc,
-      "A single Claude Sonnet 4.6 call orchestrates planning, tool use, and "
-      "synthesis. The model is given the six tool definitions plus a synthetic "
-      "emit_answer tool whose input schema IS the AnswerEnvelope. The model "
-      "must call emit_answer exactly once when ready, which forces the output "
-      "into a structured JSON shape rather than free prose."
+      "A single Claude Sonnet 4.6 agent handles planning, tool use, and "
+      "synthesis, following the ReAct pattern (think → act → observe → "
+      "repeat). The flow looks like below."
     )
     Code(doc,
         "POST /ask\n"
@@ -427,66 +420,44 @@ def section_agent_flow(doc):
     )
     H2(doc, "The six tools and what each unblocks")
     rows = [
-        ["query_conversations", "Filtered/grouped SQL over conversations. Counts, rankings, averages, time bucketing.",
-         "Q1 / Q4 aggregations"],
-        ["query_agents", "Sorted SQL over agents rollup. Coaching ranks, performance lists.",
-         "Q2 agent ranking"],
-        ["semantic_search", "Cosine search over multilingual ChromaDB. Finds conversations by MEANING, not column.",
-         "Evidence retrieval, similar-case lookup, bilingual queries"],
-        ["get_trajectory", "Per-turn sentiment arc + intent/empathy for one conv. Compact arc + interleaved turns.",
-         "Q3 trajectory narration"],
-        ["get_conversation", "Full transcript of one conv with optional EN translation. For quoting in evidence.",
-         "Drill-down after a conv_id is identified"],
-        ["list_topics", "The 15-category taxonomy with conv counts and optional examples per topic.",
-         "Discoverability — gives the planner valid filter values"],
+        ["query_conversations",
+         "Counts, ranks, or averages metrics across conversations, optionally filtered by date, topic, sentiment, or agent.",
+         "Lets the agent answer 'how many', 'top N', and 'compare over time' questions — e.g. ranking topics by negative sentiment in a given month."],
+        ["query_agents",
+         "Same as above but at the agent level — ranks agents by empathy, resolution rate, escalation rate, and so on.",
+         "Lets the agent answer 'which agent / how does agent X compare' questions — e.g. surfacing the lowest-empathy agents for a coaching review."],
+        ["semantic_search",
+         "Finds conversations whose meaning matches a free-form query, in either English or Hindi/Hinglish.",
+         "Lets the agent retrieve example conversations as evidence even when no exact word match exists — e.g. 'show me cases where the customer was rushed' returning Hinglish urgency phrases."],
+        ["get_trajectory",
+         "Returns how customer sentiment changed turn-by-turn within one specific conversation.",
+         "Lets the agent narrate the emotional arc of a single conversation — e.g. spotting when frustration peaked and whether it was resolved by the end."],
+        ["get_conversation",
+         "Returns the full transcript of one conversation, with both original and translated text.",
+         "Lets the agent quote verbatim from a specific conversation as supporting evidence — typically used right after semantic_search has identified an interesting case."],
+        ["list_topics",
+         "Returns the list of the 15 topic categories the system knows about, with how many conversations fall under each.",
+         "Lets the agent discover which topic labels are valid filter values before composing other queries — and gives the analyst a quick map of the dataset."],
     ]
-    Table(doc, ["Tool", "What it does", "What it unblocks"], rows, col_widths=[1.4, 3.0, 1.7])
+    Table(doc, ["Tool", "What it does", "What it unblocks"], rows, col_widths=[1.4, 2.5, 2.6])
 
-    H2(doc, "Worked example: question 2 (agents needing coaching)")
+    H2(doc, "Worked example: agents needing coaching")
     P(doc,
-      "The planner composed five tool calls in sequence and surfaced three "
-      "specific agents with verbatim quotes:"
-    )
-    Code(doc,
-        "1. query_agents(min_conv_count=2, sort_by=empathy_mean, order=asc, limit=10)\n"
-        "   → 10 agent rows ranked by empathy\n"
-        "2. semantic_search(query='dismissive agent reply', sentiment_max=-0.3, k=5)\n"
-        "   → 5 conversations with low sentiment + low empathy\n"
-        "3. get_conversation(conv_id=C0003634)\n"
-        "   → full 16-turn transcript of AgentVYJS's worst conversation\n"
-        "4. get_conversation(conv_id=C0009976)\n"
-        "   → full transcript of AgentTXPF's worst conversation\n"
-        "5. semantic_search(query='scripted unhelpful response', k=5)\n"
-        "   → cross-references the scripted-response pattern across topics\n"
-        "6. emit_answer(answer=…, evidence=[3 items with verbatim Hindi+English\n"
-        "               quotes], reasoning_brief=…)"
-    )
-    P(doc,
-      "The answer named AgentVYJS, AgentTXPF, and AgentTVAX; quoted the "
-      "Hinglish urgency cue \"Thoda jaldi please, flight in 2 hours\" and the "
-      "repeated scripted agent reply \"I understand this is frustrating. I'm "
-      "investigating now.\"; and identified four concrete coaching themes "
-      "(personalising empathy, reading urgency cues, avoiding off-topic replies, "
-      "offering escalation paths). Total wall-clock time: 75 seconds."
+      "On this question the agent ran 5 tool calls in ~75s: rank agents by "
+      "empathy → semantic search for low-empathy conversations → drill into "
+      "two specific conversations → cross-reference the pattern. The final "
+      "answer named three specific agents and quoted both English and "
+      "Hinglish customer turns as evidence."
     )
 
-    H2(doc, "Design choice: single-agent + tool-use")
+    H2(doc, "Design choice: single-agent over multi-agent")
     P(doc,
-      "The design is one Sonnet 4.6 call running a tool-use loop with a "
-      "structured-output sink. It qualifies as an agent (autonomous tool "
-      "selection, state-aware iteration, self-termination) and meets the "
-      "assignment's bar of a deliberate workflow rather than a single prompt."
-    )
-    P(doc,
-      "We chose single-agent + tool-use over a multi-agent design "
-      "(orchestrator + specialised sub-agents) because the task does not "
-      "require specialisation: the same model decides which slice of data to "
-      "fetch, reads the result, and writes the synthesis. Keeping that in one "
-      "continuous context preserves reasoning across the 1-11 tool calls a "
-      "single question may need, with no handoff loss between sub-agents and "
-      "without multiplying Anthropic round trips. The natural extension when "
-      "richer agency is justified is a Critic agent — listed as the "
-      "highest-leverage item in Section 9."
+      "One agent rather than an orchestrator + specialised sub-agents. The "
+      "task doesn't need specialisation — the same model can decide what to "
+      "fetch, read the result, and write the synthesis — and keeping it in "
+      "one continuous context avoids handoff loss and extra LLM round trips. "
+      "The natural extension when richer agency is needed is a critic "
+      "agent (Section 8)."
     )
 
 
@@ -527,12 +498,10 @@ def section_evaluation(doc, eval_data):
     )
     H2(doc, "6.1 Methodology")
     P(doc,
-      "Each question is scored on five dimensions: tool selection (expected "
-      "tool appears in trace), keyword coverage (fraction of expected keywords "
-      "present), evidence count (meets minimum), grounding (LLM-as-judge), "
-      "and latency. A question passes when tool-selection AND coverage ≥ 0.5 "
-      "AND evidence count are all satisfied. Grounding is reported as an "
-      "independent column."
+      "Each question is scored on five dimensions: whether the expected "
+      "tools were called, keyword coverage in the answer, evidence count, "
+      "grounding (LLM-as-judge), and latency. A question passes the first "
+      "three; grounding is reported as an independent column."
     )
     P(doc,
       f"Grounding grader: {eval_data.get('grader_model','Haiku')} with a "
@@ -632,196 +601,156 @@ def section_bonus_extensions(doc):
     H1(doc, "7. Bonus extensions")
 
     H2(doc, "7.1 Knowledge retrieval (RAG)")
-    Bullet(doc,
-      "Indexed: one ChromaDB document per conversation. Document text = "
-      "role-tagged turns ([customer] / [agent]) in turn_index order, joined "
-      "by newlines. The ORIGINAL text_clean is embedded — not the English "
-      "translation — because the configured embedding model is multilingual. "
-      "Per-doc metadata: conv_id, agent_name, customer_name, turn_count, "
-      "start_ts, end_ts, topic, customer_sentiment_overall, escalation_flag, language."
-    )
-    Bullet(doc,
-      "Triggered: when the planner judges that a question needs examples, "
-      "evidence, or 'similar cases' — patterns it has been instructed to "
-      "recognise. In the eval set, semantic_search fired on 9 of 15 "
-      "questions, most heavily on agent-coaching, recurring-concerns, and all "
-      "Hindi/Hinglish queries."
-    )
-    Bullet(doc,
-      "Evidence returned: top-k (conv_id, similarity, document excerpt, "
-      "metadata) tuples respecting any topic / agent / language / sentiment "
-      "filters the planner attaches. The Synthesizer then pulls the most "
-      "relevant via get_conversation for verbatim quoting in the evidence list."
-    )
-    Bullet(doc,
-      "Improvement to answer: lifts answers from generic statistics to "
-      "evidence-backed specifics — the saved user preference is to surface "
-      "concrete examples over statistical caveats, and the eval confirms this: "
-      "9 of 15 answers include at least 3 evidence items, every Hindi-language "
-      "answer retrieves at least one original-language quote."
+
+    P(doc, "How retrieval is indexed:", bold=True)
+    P(doc,
+      "One document per conversation, stored in a local vector store using "
+      "a multilingual embedding model so a single index covers both English "
+      "and Hindi/Hinglish without translation. Each document also carries "
+      "metadata (topic, agent, language, sentiment, escalation flag) so "
+      "retrieval can be scoped to a subset of the dataset."
     )
 
-    H2(doc, "7.2 Specialised LLM agent (sentiment-trajectory analyst)")
-    Bullet(doc,
-      "Chosen: a purpose-built sentiment-trajectory analyst implemented "
-      "through the get_trajectory tool plus a dedicated Sonnet prompt path. "
-      "The tool returns the compact customer_arc array plus per-turn role/"
-      "intent/empathy/text fields. The planner uses get_trajectory whenever "
-      "the question references a specific conv_id and asks about sentiment "
-      "change over time."
+    P(doc, "When retrieval is triggered:", bold=True)
+    P(doc,
+      "The agent decides on its own — it reaches for semantic search "
+      "whenever the analyst asks for examples, evidence, or similar cases. "
+      "In the evaluation set this happened on 9 of 15 questions, most "
+      "heavily on agent-coaching and Hindi/Hinglish queries."
     )
-    Bullet(doc,
-      "Fits into the flow: complements the structured-aggregation path. "
-      "Where query_conversations/query_agents handle ‘which / how many / "
-      "highest’ questions, get_trajectory handles ‘why did it go wrong inside "
-      "THIS conversation’ — letting the same agent loop answer both "
-      "population-level and conversation-level analytical questions."
+
+    P(doc, "What evidence is returned:", bold=True)
+    P(doc,
+      "The top few most semantically similar conversations (typically 3–5), "
+      "each with a similarity score, a short excerpt, and the indexed "
+      "metadata. The agent then pulls verbatim quotes from the most "
+      "relevant ones into the final answer's evidence section."
     )
-    Bullet(doc,
-      "Evaluation: both trajectory questions in the eval set (Q06 Hinglish "
-      "and Q07 English) passed with full coverage and 3 evidence items each. "
-      "The Q06 narrative identified an inflection turn (turn 14, +0.6 spike "
-      "after a transient resolution) and a relapse (turn 16, back to –0.6) "
-      "before quoting the customer's urgency cue verbatim — exactly the "
-      "kind of analyst-actionable summary the assignment asks for."
+
+    P(doc, "How retrieval improves the final answer:", bold=True)
+    P(doc,
+      "It lifts answers from generic statistics to cited, concrete "
+      "examples — real conversations over statistical disclaimers. In the "
+      "eval, 9 of 15 answers include 3+ evidence quotes, and every "
+      "Hindi-language question is answered with at least one original-"
+      "language quote."
+    )
+
+    H2(doc, "7.2 Specialised LLM for offline labelling")
+
+    P(doc, "Why this was chosen:", bold=True)
+    P(doc,
+      "We use an LLM to do topic extraction, sentiment analysis, intent "
+      "detection, empathy detection, and language detection on every turn. "
+      "Classical ML classifiers would need labelled training data we don't "
+      "have and would struggle with the bilingual English + Hindi/Hinglish "
+      "mix; an LLM handles both out of the box."
+    )
+
+    P(doc, "How it fits the flow:", bold=True)
+    P(doc,
+      "The labelling runs once offline, then the labels and their rollups "
+      "(per conversation, per agent) are saved into the database. At "
+      "question time the runtime tools just read these precomputed values "
+      "directly — no LLM call per tool — so the agent can answer most "
+      "questions in seconds."
+    )
+
+    P(doc, "How its usefulness was evaluated:", bold=True)
+    P(doc,
+      "The labels are checked indirectly by the evaluation set: questions "
+      "like \"topics with most negative sentiment last month\" or \"agents "
+      "with lowest empathy\" only return the right answers if the underlying "
+      "labels are correct. All 15 evaluation questions pass, which "
+      "indicates the labels are reliable enough for analyst use."
     )
 
     H2(doc, "7.3 Memory integration")
-    Bullet(doc,
-      "Stored: session-scoped SQLite rows keyed by (session_id, turn_idx). "
-      "Each row stores the analyst's question and the full AnswerEnvelope "
-      "from the bot's response, plus created_at and expires_at timestamps."
+
+    P(doc, "What is stored:", bold=True)
+    P(doc,
+      "Each question and its full structured answer are stored in a session-"
+      "scoped table, keyed by session id and turn index. Stored content is "
+      "PII-redacted before persistence (emails, phone numbers, card-like "
+      "numbers replaced with placeholders)."
     )
-    Bullet(doc,
-      "Retrieved: the agent loads the last N=3 turns of the session at the "
-      "start of every /ask call and prepends them as alternating user / "
-      "assistant messages before the new question. This lets the planner see "
-      "prior reasoning and evidence so follow-up questions (\"drill into the "
-      "agent you just mentioned\") work without the analyst re-typing context."
+
+    P(doc, "How it is retrieved:", bold=True)
+    P(doc,
+      "At the start of every new question, the agent loads the last few "
+      "turns of the current session and prepends them as prior context "
+      "before reading the new question. This is automatic — the analyst "
+      "doesn't have to opt in."
     )
-    Bullet(doc,
-      "Affects later responses: enables coherent multi-turn investigations. "
-      "An analyst can ask Q4 (agents needing coaching), then Q2-style "
-      "follow-ups about specific agents the previous answer named, without "
-      "the agent re-running the same SQL aggregations."
+
+    P(doc, "How it affects later responses:", bold=True)
+    P(doc,
+      "Follow-up questions can refer back to earlier ones without the "
+      "analyst re-typing context — for example, asking about \"the agent "
+      "you just mentioned\" works because the prior answer is in the agent's "
+      "context. The agent can also reuse prior evidence instead of "
+      "re-fetching it."
     )
-    Bullet(doc,
-      "Reliability & privacy: 24h TTL (expired rows are filtered on read "
-      "and lazily purged on write); session_ids are random 16-char hex (no "
-      "user identifier baked in); regex PII redaction (emails, phones, "
-      "credit-card-like numeric runs) is applied to both the stored question "
-      "and the serialised answer envelope before persistence. Synthetic "
-      "Cust####/Agent#### identifiers from the dataset are intentionally NOT "
-      "redacted because they are not real PII and are required for follow-up "
-      "continuity."
+
+    P(doc, "Reliability and privacy considerations:", bold=True)
+    P(doc,
+      "Memory is scoped per session so one analyst's questions never bleed "
+      "into another's, and rows expire after 24 hours so old context "
+      "doesn't accumulate. Synthetic customer/agent identifiers from the "
+      "dataset are intentionally not redacted because they are not real "
+      "PII and follow-up continuity needs them."
     )
 
 
-def section_limitations(doc):
-    H1(doc, "8. Limitations")
-    Bullet(doc,
-      "Topic-slot extraction is dataset-fitted. backend/preprocessing/taxonomy.py uses 8 "
-      "regex templates derived by inspection of the Syncora.ai openings; on "
-      "free-form real-world customer openings this would not generalise. "
-      "Plug-in points exist behind extract_slot() for an LLM-based "
-      "replacement."
-    )
-    Bullet(doc,
-      "Per-turn timestamps are not monotonic in the source CSV; we use "
-      "turn_index for ordering and min(turn.timestamp) as conversation_start_ts. "
-      "Any real production deployment must validate that incoming data has "
-      "monotonic timestamps before adopting our reliance on turn_index."
-    )
-    Bullet(doc,
-      "0 dismissive agent turns in the synthetic data. The empathy axis "
-      "differentiates 'empathetic' vs 'neutral' only; coaching judgments "
-      "about dismissive behaviour cannot be made from this dataset."
-    )
-    Bullet(doc,
-      "1.004 conversations per agent on average. Agent-ranking questions "
-      "cannot draw statistically reliable conclusions; the bot deliberately "
-      "leans into concrete example interactions instead of statistical "
-      "rankings (saved user preference)."
-    )
-    Bullet(doc,
-      "LLM-as-judge grading is self-correlated. Even though we use Haiku "
-      "for grading while the agent uses Sonnet, both are Anthropic-family "
-      "models. Independent grading (e.g. GPT-4) would provide stronger "
-      "evaluation."
-    )
-    Bullet(doc,
-      "Eval set is small (N=15). Pass rates and grounding means are "
-      "illustrative; production would need 100+ hand-graded questions plus "
-      "spot-checked synthetic adversarial cases."
-    )
-    Bullet(doc,
-      "Closed-set topic taxonomy. Novel conversation types beyond the 15 "
-      "categories fall back to 'unknown'. Acceptable for this synthetic "
-      "dataset (0 unknowns observed) but brittle for production."
-    )
-    Bullet(doc,
-      "Single-region, single-process deployment. ChromaDB and SQLite live "
-      "on disk in the API process. Production would horizontal-scale via "
-      "OpenSearch (or pgvector) and Postgres."
+def section_limitations_and_improvements(doc):
+    H1(doc, "8. Limitations and next improvements")
+    P(doc,
+      "The biggest limitation on this project is the time available to "
+      "build it. The prototype works end-to-end, but every layer has clear "
+      "room for improvement. The most impactful next steps are below."
     )
 
+    P(doc, "1. A more general preprocessing approach.", bold=True)
+    P(doc,
+      "The current preprocessing pipeline is fitted to the specific shape "
+      "of this dataset — topic extraction uses pattern matching keyed to the "
+      "templated customer messages, and the data cleaner exploits the "
+      "specific gibberish-suffix quirk. A more general approach (an LLM-"
+      "based topic extractor and a content-aware cleaner) is needed before "
+      "this would work on real, free-form customer messages."
+    )
 
-def section_next_improvements(doc):
-    H1(doc, "9. Next improvements")
-    Bullet(doc,
-      "Add an online Critic agent (highest leverage). Today the system is a "
-      "single-agent + tool-use loop (Section 4). The cheapest upgrade to a "
-      "genuine multi-agent workflow is a post-emit_answer Haiku call that "
-      "reads (question, answer, evidence, tool_calls) and judges grounding "
-      "sufficiency. When grounding is weak the critic emits structured "
-      "feedback — \"the claim about Financial Products lacks supporting "
-      "evidence\" — and the planner runs one more retrieval pass before "
-      "re-emitting. This directly targets the three weakest eval grounding "
-      "scores (q06 0.65, q08 0.75, q09 0.75) at ~$0.005 and ~5s per question."
+    P(doc, "2. A larger eval set with expected answers.", bold=True)
+    P(doc,
+      "The current evaluation set has only 15 questions and no expected "
+      "answer per question, so it only checks that the right tools were "
+      "called and that some evidence came back — not whether the actual "
+      "answer is correct. With a gold-standard expected answer per "
+      "question, an LLM-as-judge could score completion rate directly "
+      "(does the actual answer cover the expected content?), and the eval "
+      "would catch quality regressions rather than just behaviour changes."
     )
-    Bullet(doc,
-      "Generalise topic extraction. Replace the regex template bank with an "
-      "LLM-based slot extractor OR an embedding-cluster-then-label approach "
-      "(multilingual embeddings + HDBSCAN + LLM cluster labelling). The "
-      "plug-in points already exist behind extract_slot()."
+
+    P(doc, "3. Production-grade setup.", bold=True)
+    P(doc,
+      "Several pieces are local-prototype-shaped and would change for a "
+      "real deployment. The single-file database would move to a managed "
+      "database (e.g. Postgres) for concurrent access; the local vector "
+      "store would move to a distributed one (e.g. OpenSearch or pgvector); "
+      "session memory would move to Redis with native expiry; the single-"
+      "process web API would be containerised behind a load balancer. "
+      "Authentication and per-analyst rate limiting are also missing."
     )
-    Bullet(doc,
-      "Stronger evaluation. Add a 100-question eval set with per-claim "
-      "ground-truth annotations, cross-model grading (Anthropic + OpenAI/"
-      "Gemini), and self-consistency runs (grade each question twice, report "
-      "mean ± stdev)."
-    )
-    Bullet(doc,
-      "Tighten the grader rubric. The trajectory edge case (Q06) shows that "
-      "get_trajectory should grant grounding to turn-level numerical claims "
-      "the way query_conversations does for aggregate-level numerical claims."
-    )
-    Bullet(doc,
-      "Detect and refuse interpretive leaps. The Q08 finding ('login "
-      "lockouts are a product/ops gap') shows the agent does some editorial "
-      "speculation. A stronger system-prompt rule + grounding-aware refinement "
-      "loop would catch and rewrite these."
-    )
-    Bullet(doc,
-      "Streaming responses. Currently the API waits for the full agent loop "
-      "(up to 75s) before returning. Anthropic supports streaming; we could "
-      "emit tool-call traces as they happen so the UI shows progress instead "
-      "of a spinner."
-    )
-    Bullet(doc,
-      "Production storage. SQLite → Postgres for shared-state and write "
-      "concurrency; ChromaDB → OpenSearch/pgvector for distributed vector "
-      "search; sessions table → Redis with native TTL."
-    )
-    Bullet(doc,
-      "Eval-time cost reduction. Cache embedding-model load (already "
-      "cached in-process via lru_cache); add server-side response caching "
-      "keyed by question hash for FAQ-style repeated queries."
-    )
-    Bullet(doc,
-      "Cross-language eval. Currently 5 of 15 questions are Hindi/Hinglish; "
-      "the bilingual coverage rule could be raised to 50% for tighter "
-      "regression coverage, with explicit code-switching examples."
+
+    P(doc, "4. Add an online critic to push grounding higher.", bold=True)
+    P(doc,
+      "Today one agent gathers data and writes the answer in one loop. A "
+      "natural next step is to add a critic that reads the final answer "
+      "plus its evidence and decides whether the grounding is good enough; "
+      "if not, it asks the planner to retrieve more evidence and rewrite. "
+      "This is the cheapest single change that would push the system from "
+      "single-agent to a clear multi-agent workflow, and it directly "
+      "targets the few evaluation questions where grounding was weakest."
     )
 
 
@@ -930,8 +859,7 @@ def build() -> Path:
     section_models_and_tools(doc)
     section_evaluation(doc, eval_data)
     section_bonus_extensions(doc)
-    section_limitations(doc)
-    section_next_improvements(doc)
+    section_limitations_and_improvements(doc)
     section_appendix(doc)
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
