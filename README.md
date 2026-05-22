@@ -1,32 +1,51 @@
 # Conversation Analysis Bot
 
-Prototype for the take-home assignment: an analyst-facing chat bot that answers
-analytical questions over a 3,000-conversation customer-support dataset using a
-deliberate planner-synthesizer agent workflow.
-
-> **Submission deliverables** — see `CLAUDE.md` for the locked checklist.
-> The report lives in `report/`; the source code is this repo.
+Prototype that lets a contact-centre analyst ask analytical questions over a
+3,000-conversation customer-support dataset and get evidence-backed answers
+through an agent workflow.
 
 ---
 
-## Quick start
+## Setup
+
+### 1. Install dependencies
 
 ```bash
-# 1. Install (uv is recommended; pip works too)
 uv sync                          # or: pip install -e .
+```
 
-# 2. Configure secrets
+### 2. Configure secrets
+
+```bash
 cp .env.example .env
 $EDITOR .env                     # set ANTHROPIC_API_KEY
+```
 
-# 3. Run the offline preparation pipeline (one-shot, resumable).
-#    The raw dataset ships in the repo at data/cs_conversations.csv (~23 MB).
+### 3. Run the offline preprocessing pipeline
+
+Cleans the raw CSV, labels every distinct turn (sentiment, intent, empathy,
+language, …), rolls up to conversation and agent level, and builds the
+multilingual vector index. One-shot, idempotent — safe to re-run; finished
+stages skip on subsequent runs.
+
+The raw dataset (~23 MB) ships in the repo at `data/cs_conversations.csv`,
+so no extra download is needed.
+
+```bash
 uv run python scripts/prepare_data.py
+```
 
-# 4. Start the API
+---
+
+## Run
+
+After preprocessing is done:
+
+```bash
+# Terminal 1 — start the API
 uv run uvicorn backend.api:app --reload --port 8000
 
-# 5. In another terminal, start the analyst UI
+# Terminal 2 — start the analyst chat UI
 uv run streamlit run ui/app.py
 ```
 
@@ -34,58 +53,7 @@ Open the Streamlit URL it prints and ask a question.
 
 ---
 
-## Dataset
-
-Primary source: **Customer Support Conversation Dataset — Syncora.ai** on Kaggle.
-We use the 3,000-conversation sample shipped with the assignment as
-`data/cs_conversations.csv` (41,965 turn rows, Aug–Dec 2025).
-
-The raw CSV (~23 MB) is committed to the repo for one-command setup —
-clone and run, no extra download step.
-
-Schema: `conv_id, turn_index, timestamp, role, text, customer_name, agent_name`.
-
-### Bilingual content
-
-**The dataset is bilingual** — roughly half the conversations are in English
-and half in romanized Hindi / Hinglish (e.g.
-*"App crash ho rahi hai while using Wallet."*,
-*"Mujhe Refund ke baare mein help chahiye."*). Topic slots are always in
-English even inside Hindi templates (`Wallet`, `Refund`, `FASTag` …).
-
-The preprocessing pipeline preserves the original text in `turns.text_clean`
-and stores a parallel English translation in `turns.text_clean_en`, with a
-`turns.language` label (`en` / `hi` / `mixed`). Classification, embeddings,
-and the agent loop are all multilingual by design — translation is never
-used as an intermediate step. See `CLAUDE.md` for the full bilingual-handling
-contract.
-
-See `report/` for the documented preparation steps, assumptions, and derived
-fields.
-
----
-
-## Architecture
-
-```
-CSV ─► prefix_clean ─► per-turn Haiku classifier ─► rollups ─► SQLite
-                                                            └► ChromaDB
-
-Streamlit ─► FastAPI /ask ─► Planner (Sonnet 4.6, tool-use) ─► Synthesizer
-                              tools: query_conversations, query_agents,
-                                     semantic_search, get_trajectory,
-                                     get_conversation, list_topics
-```
-
-The Planner decides which tools to call for each analyst question; the
-Synthesizer composes a structured JSON answer with cited evidence.
-
----
-
 ## Sample requests
-
-See `examples/` for `curl` requests and recorded JSON outputs covering the four
-example questions plus a few harder follow-ups.
 
 ```bash
 curl -s -X POST http://localhost:8000/ask \
@@ -94,81 +62,34 @@ curl -s -X POST http://localhost:8000/ask \
   | jq .
 ```
 
+Response shape:
+
+```json
+{
+  "session_id": "abc123...",
+  "envelope": {
+    "answer": "In November 2025, the five topics ...",
+    "evidence": [
+      {"conv_id": "C0001241", "quote": "...", "relevance": "..."}
+    ],
+    "tool_calls": [
+      {"tool": "query_conversations", "arguments": {"...": "..."},
+       "result_summary": "5 row(s)"}
+    ],
+    "reasoning_brief": "...",
+    "uncertainty": null
+  }
+}
+```
+
+A full set of recorded outputs across 15 sample questions (covering all four
+assignment example questions plus follow-ups in English and Hindi/Hinglish)
+lives in `eval/results-latest.json`.
+
 ---
 
 ## Environment variables
 
-Documented in `.env.example`. The only required variable is
-`ANTHROPIC_API_KEY`; everything else has sensible defaults.
-
-**Credentials are never hardcoded** — all keys load from environment via
-`python-dotenv`.
-
----
-
-## Observability (optional, via Langfuse)
-
-When the `LANGFUSE_PUBLIC_KEY` env var is set, every `/ask` request becomes
-a trace in the Langfuse UI showing the full agent loop — system prompt,
-each tool call with args + result, latency per step, the final structured
-envelope. Skipping setup is fine; the agent loop simply doesn't emit traces.
-
-### Self-host in one command
-
-```bash
-docker compose -f docker-compose.langfuse.yml up -d
-open http://localhost:3000
-```
-
-In the Langfuse UI: create an org, create a project, copy the **Public** and
-**Secret** API keys, then add them to your `.env`:
-
-```bash
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=http://localhost:3000
-```
-
-Restart `uvicorn` and the next `/ask` request will appear in the Langfuse
-UI's *Tracing* tab.
-
-### Or use Langfuse Cloud
-
-Sign up at https://cloud.langfuse.com → create a project → copy keys →
-set `LANGFUSE_HOST=https://cloud.langfuse.com`. No Docker needed.
-
-The vendored `docker-compose.langfuse.yml` is Langfuse's official self-host
-stack (6 services: web, worker, postgres, clickhouse, redis, minio). Default
-secrets are sufficient for local prototype use — see the file's header for
-the production-hardening note.
-
----
-
-## Repository layout
-
-```
-.
-├── CLAUDE.md                 # locked submission spec + working agreements
-├── README.md                 # this file
-├── report/                   # DOCX/PDF deliverable + assets
-├── scripts/prepare_data.py   # offline pipeline (idempotent, resumable)
-├── backend/                  # serving (api/agent/tools/memory) + preprocessing/ subpackage
-├── ui/app.py                 # Streamlit analyst chat
-├── eval/                     # ~15 Q/A pairs and the eval runner
-├── examples/                 # sample curl requests and recorded outputs
-├── data/                     # raw CSV + processed.db + chroma/ (gitignored)
-└── pyproject.toml
-```
-
----
-
-## Limitations & next improvements
-
-Tracked in the report's final section. High level:
-- Topic taxonomy is closed-set and frozen — new conversation types beyond the
-  pre-derived 15 labels (in `data/topic_taxonomy.yaml`) fall into an `unknown`
-  bucket.
-- Per-turn timestamps in the source CSV are not monotonic; we use `turn_index`
-  for ordering and `min(turn.timestamp)` as the conversation start time.
-- Single-region, single-process deployment; production would move SQLite →
-  Postgres/Redshift and ChromaDB → OpenSearch / pgvector.
+Every variable is documented in `.env.example`. The only required one is
+`ANTHROPIC_API_KEY`; everything else has a sensible default. Credentials are
+loaded from `.env` via `python-dotenv` and are never hardcoded.
