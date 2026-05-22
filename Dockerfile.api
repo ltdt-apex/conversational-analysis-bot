@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+#
+# convbot-api: FastAPI serving image. Reads the prepared SQLite + ChromaDB
+# stores produced by convbot-prepare and answers analyst questions via the
+# agent loop. Exposes port 8000.
+#
+# Deps are listed explicitly here (rather than via pyproject.toml) so each
+# Dockerfile is self-contained. Version constraints mirror pyproject; bump
+# them here whenever pyproject is bumped.
+
+FROM python:3.13-slim
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/
+
+ENV PYTHONUNBUFFERED=1 \
+    HF_HOME=/root/.cache/huggingface
+
+WORKDIR /app
+
+# Serving-specific deps: HTTP framework + Claude SDK + semantic-search stack
+# (chromadb + sentence-transformers for the semantic_search tool).
+# Langfuse is optional at runtime but imported in backend.observability so
+# the package must be present.
+RUN uv pip install --system --no-cache \
+        "anthropic>=0.40.0" \
+        "python-dotenv>=1.0.1" \
+        "pydantic>=2.9.0" \
+        "pyyaml>=6.0.2" \
+        "fastapi>=0.115.0" \
+        "uvicorn[standard]>=0.32.0" \
+        "sentence-transformers>=3.3.0" \
+        "chromadb>=0.5.20" \
+        "langfuse>=4.6.1"
+
+COPY backend/ backend/
+# The list_topics tool reads this YAML at runtime.
+COPY data/topic_taxonomy.yaml data/topic_taxonomy.yaml
+
+EXPOSE 8000
+CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"]

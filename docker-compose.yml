@@ -1,0 +1,69 @@
+# End-to-end stack — three services, three images, three Dockerfiles.
+#
+#   prepare  → convbot-prepare:latest   one-shot offline preprocessing
+#              (Dockerfile.prepare; runs scripts/prepare_data.py)
+#   api      → convbot-api:latest       FastAPI on :8000
+#              (Dockerfile.api; backend.api:app)
+#   ui       → convbot-ui:latest        Streamlit on :8501 — slim image
+#              (Dockerfile.ui; no torch/chromadb/anthropic)
+#
+# Usage:
+#   cp .env.example .env && $EDITOR .env          # set ANTHROPIC_API_KEY
+#   docker compose up --build
+#   open http://localhost:8501                    # analyst chat UI
+#
+# Tear down:
+#   docker compose down            # keep volumes (prepared data + HF cache)
+#   docker compose down --volumes  # wipe everything
+
+services:
+  prepare:
+    build:
+      context: .
+      dockerfile: Dockerfile.prepare
+    image: convbot-prepare:latest
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - hf-cache:/root/.cache/huggingface
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: convbot-api:latest
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - hf-cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/').status==200 else 1)\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    image: convbot-ui:latest
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Inside the docker network, talk to the api service by name.
+      ASK_API_URL: "http://api:8000"
+    ports:
+      - "8501:8501"
+
+volumes:
+  # Persists the sentence-transformer model download (~120 MB) so subsequent
+  # `docker compose up` runs don't re-download it. Shared between prepare
+  # and api since both use it for semantic_search / embedding seeding.
+  hf-cache:

@@ -961,6 +961,15 @@ def section_limitations_and_improvements(doc):
 def section_appendix(doc):
     H1(doc, "Appendix A — Setup")
     Code(doc,
+        "# === Option A: Docker (recommended) ===\n"
+        "# Three services, three images, one command:\n"
+        f"git clone {REPO_URL}.git\n"
+        "cd calabrio-assignment-conversational-bot\n"
+        "cp .env.example .env && $EDITOR .env       # set ANTHROPIC_API_KEY\n"
+        "docker compose up --build                  # builds prepare/api/ui\n"
+        "open http://localhost:8501                 # analyst chat UI\n"
+        "\n"
+        "# === Option B: local Python (no Docker) ===\n"
         "# 1. Clone and install\n"
         f"git clone {REPO_URL}.git\n"
         "cd calabrio-assignment-conversational-bot\n"

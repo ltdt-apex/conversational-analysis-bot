@@ -1,0 +1,51 @@
+# Mirror of .gitignore, with two important differences:
+#   - .git is excluded so the build context doesn't carry repo history
+#   - data/cs_conversations.csv IS included (it's the input the prepare
+#     stage reads); generated SQLite + Chroma artifacts are NOT
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.uv-cache/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Env / secrets — passed via env_file at run time, never baked into the image
+.env
+.env.local
+.env.*.local
+
+# Generated data — the prepare service recreates these inside the mounted
+# volume; we don't want stale host copies in the build context.
+data/processed.db
+data/processed.db-journal
+data/processed.db-wal
+data/processed.db-shm
+data/chroma/
+data/checkpoints/
+
+# Eval / report artifacts
+eval/results/
+report/build/
+
+# Other compose files (the langfuse one belongs to a separate stack)
+docker-compose.langfuse.yml
+
+# Editor / OS noise
+.~lock.*
+.vscode/
+.idea/
+.DS_Store
+*.swp
