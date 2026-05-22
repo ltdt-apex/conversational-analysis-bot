@@ -14,13 +14,16 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend import agent
+from backend import agent, observability
 from backend.config import Config
 from backend.schemas import AskRequest, AskResponse
 
 
 logger = logging.getLogger("backend.api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+# Initialise Langfuse tracing if LANGFUSE_PUBLIC_KEY is set; no-op otherwise.
+observability.init()
 
 
 app = FastAPI(

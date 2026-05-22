@@ -43,9 +43,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from anthropic import Anthropic  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from backend import agent  # noqa: E402
+from backend import agent, observability  # noqa: E402
 from backend.config import Config  # noqa: E402
 from backend.schemas import AnswerEnvelope  # noqa: E402
+
+# Initialise Langfuse tracing if configured; safe no-op otherwise.
+observability.init()
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

@@ -21,7 +21,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from backend import schemas as S
+from backend import observability, schemas as S
 from backend.preprocessing import taxonomy as tax
 from backend.config import Config
 from backend.db import connect
@@ -541,7 +541,21 @@ def all_definitions() -> list[dict[str, Any]]:
 
 
 def call(name: str, raw_args: dict[str, Any], cfg: Config) -> Any:
-    """Dispatch a tool call by name."""
+    """Dispatch a tool call by name. Wraps execution in a Langfuse span
+    named after the actual tool when tracing is enabled."""
     if name not in TOOLS:
         raise KeyError(f"unknown tool: {name!r}")
-    return TOOLS[name].run(raw_args, cfg)
+    with observability.span(name, observation_type="tool", input=raw_args) as obs:
+        result = TOOLS[name].run(raw_args, cfg)
+        if obs is not None:
+            try:
+                # Small, log-friendly summary; full result stays in the planner
+                # context, not in the trace UI.
+                if isinstance(result, list):
+                    summary = {"kind": "list", "count": len(result)}
+                else:
+                    summary = {"kind": type(result).__name__}
+                obs.update(output=summary)
+            except Exception:  # noqa: BLE001
+                pass
+        return result
