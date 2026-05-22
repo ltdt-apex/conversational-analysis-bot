@@ -4,9 +4,43 @@ Prototype that lets a contact-centre analyst ask analytical questions over a
 3,000-conversation customer-support dataset and get evidence-backed answers
 through an agent workflow.
 
+The raw dataset (~23 MB) ships in the repo at `data/cs_conversations.csv`,
+so no extra download is needed for either setup path below.
+
 ---
 
-## Setup
+## Setup — Docker (recommended)
+
+Three services, three images, one command. Each service has its own
+Dockerfile with only the dependencies it needs:
+
+| Service | Dockerfile | Port | Role |
+|---|---|---|---|
+| `prepare` | `Dockerfile.prepare` | — | One-shot offline preprocessing |
+| `api` | `Dockerfile.api` | 8000 | FastAPI serving the agent loop |
+| `ui` | `Dockerfile.ui` | 8501 | Streamlit chat (slim — no torch/chromadb) |
+
+```bash
+# 1. Configure secrets (.env is gitignored)
+cp .env.example .env
+$EDITOR .env                     # set ANTHROPIC_API_KEY
+
+# 2. Build + start everything
+docker compose up --build
+```
+
+Then visit **http://localhost:8501** for the analyst chat.
+
+### Quick check after `up`
+
+```bash
+curl -fsS http://localhost:8000/                          # → {"status":"ok",...}
+curl -fsS http://localhost:8501/_stcore/health            # → ok
+```
+
+---
+
+## Setup — local Python (no Docker)
 
 ### 1. Install dependencies
 
@@ -23,29 +57,17 @@ $EDITOR .env                     # set ANTHROPIC_API_KEY
 
 ### 3. Run the offline preprocessing pipeline
 
-Cleans the raw CSV, labels every distinct turn (sentiment, intent, empathy,
-language, …), rolls up to conversation and agent level, and builds the
-multilingual vector index. One-shot, idempotent — safe to re-run; finished
-stages skip on subsequent runs.
-
-The raw dataset (~23 MB) ships in the repo at `data/cs_conversations.csv`,
-so no extra download is needed.
-
 ```bash
 uv run python scripts/prepare_data.py
 ```
 
----
-
-## Run
-
-After preprocessing is done:
+### 4. Start the API and the UI
 
 ```bash
-# Terminal 1 — start the API
+# Terminal 1 — API
 uv run uvicorn backend.api:app --reload --port 8000
 
-# Terminal 2 — start the analyst chat UI
+# Terminal 2 — analyst chat UI
 uv run streamlit run ui/app.py
 ```
 

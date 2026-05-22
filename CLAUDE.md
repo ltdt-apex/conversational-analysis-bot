@@ -87,6 +87,10 @@ Streamlit UI ─► FastAPI /ask ─► Planner agent (Claude Sonnet 4.6, tool-u
 ├── report/                       (DOCX/PDF deliverable + assets)
 ├── .env.example                  (lists required env vars, no real values)
 ├── pyproject.toml or requirements.txt
+├── Dockerfile.prepare            (image for the offline preprocessing service)
+├── Dockerfile.api                (image for the FastAPI serving service)
+├── Dockerfile.ui                 (image for the Streamlit chat service)
+├── docker-compose.yml            (one-command stack for prepare + api + ui)
 ├── data/
 │   ├── cs_conversations.csv      (input; committed for one-command setup)
 │   ├── processed.db              (SQLite, gitignored)
