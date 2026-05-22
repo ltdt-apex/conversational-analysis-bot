@@ -237,6 +237,24 @@ deferred pending a deeper look at the current pipeline behaviour.
 - **D12 Metadata enrichment.** Add `intent_majority`, `has_escalation_turn`,
   `resolved` to ChromaDB metadata for finer filter support.
 
+### Failed experiments (already tried — don't redo without addressing the issue)
+
+- **F-X1 Two-model split: Sonnet planner + Haiku synthesizer.** Tried on
+  branch `experiment/haiku-synthesizer` (reverted). Hypothesis was that
+  Haiku could write the structured `emit_answer` envelope faster than
+  Sonnet (~6s vs ~10-19s) so total latency would drop. Outcome was the
+  opposite at the median: **pass rate 100% → 93%, mean grounding 0.90 →
+  0.85, median latency 28.4s → 36.4s, p95 43.9s → 49.1s**. Simple
+  aggregation questions did get faster (q01 -3s, q02 -12s) but complex
+  multi-tool questions got materially slower (q05 +19s, q10 +15s, q12-13
+  +8s each). Root cause: the architecture splits one call into two phases,
+  adding ~5s of round-trip overhead per question. Haiku's emit_answer
+  speed-up only beats that overhead on simple aggregation paths. Don't
+  retry without solving the round-trip overhead (e.g. share KV cache,
+  parallel synth call, or only swap models on questions with single-tool
+  paths). Eval snapshot lives in `eval/results-baseline.json` for
+  comparison.
+
 ### Conversation-level temporal handling (data-shape)
 - **E13 Switch `conversation_start_ts` from `MIN(turn.timestamp)` to
   `MEDIAN(turn.timestamp)`.** Per-turn timestamps in the source CSV are
