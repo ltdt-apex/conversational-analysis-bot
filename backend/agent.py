@@ -31,7 +31,7 @@ from typing import Any
 from anthropic import Anthropic
 from pydantic import BaseModel
 
-from backend import memory, tools
+from backend import memory, observability, tools
 from backend.preprocessing import taxonomy as tax
 from backend.config import Config
 from backend.schemas import AnswerEnvelope, EvidenceItem, ToolCallTrace
@@ -46,6 +46,7 @@ MAX_TOOL_RESULT_CHARS = 8_000
 # ---------------------------------------------------------------------------
 
 
+@observability.traced(name="ask")
 def answer_question(
     question: str,
     cfg: Config,
@@ -65,8 +66,22 @@ def answer_question(
     tool_defs = tools.all_definitions() + [_emit_answer_definition()]
     trace: list[ToolCallTrace] = []
 
+    observability.set_trace_io(input=question)
+    observability.update_trace_metadata(
+        session_id=session_id,
+        metadata={"history_turns": len(history)},
+    )
+
     envelope = _run_planner_loop(client, cfg, messages, tool_defs, trace)
     memory.save_turn(cfg, session_id, question, envelope)
+
+    observability.set_trace_io(input=question, output=envelope.answer)
+    observability.update_span_metadata(
+        tool_calls=len(envelope.tool_calls),
+        evidence_count=len(envelope.evidence),
+        has_uncertainty=envelope.uncertainty is not None,
+    )
+
     return session_id, envelope
 
 
@@ -84,13 +99,35 @@ def _run_planner_loop(
 ) -> AnswerEnvelope:
     """Iterate planner → tool calls until ``emit_answer`` or budget exhausted."""
     for iteration in range(MAX_TOOL_ITERATIONS + 1):
-        resp = client.messages.create(
+        with observability.span(
+            f"planner-turn-{iteration}",
+            observation_type="generation",
             model=cfg.planner_model,
-            max_tokens=4096,
-            system=_system_prompt(cfg),
-            tools=tool_defs,
-            messages=messages,
-        )
+            input={"messages": len(messages), "tools_available": len(tool_defs)},
+        ) as obs:
+            resp = client.messages.create(
+                model=cfg.planner_model,
+                max_tokens=4096,
+                system=_system_prompt(cfg),
+                tools=tool_defs,
+                messages=messages,
+            )
+            if obs is not None:
+                try:
+                    obs.update(
+                        output={
+                            "tool_uses": [
+                                b.name for b in resp.content if b.type == "tool_use"
+                            ],
+                            "stop_reason": resp.stop_reason,
+                            "usage": {
+                                "input_tokens": resp.usage.input_tokens,
+                                "output_tokens": resp.usage.output_tokens,
+                            },
+                        }
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
 
         # Bare prose without any tool_use → wrap whatever the model said.

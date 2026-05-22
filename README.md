@@ -108,6 +108,44 @@ Documented in `.env.example`. The only required variable is
 
 ---
 
+## Observability (optional, via Langfuse)
+
+When the `LANGFUSE_PUBLIC_KEY` env var is set, every `/ask` request becomes
+a trace in the Langfuse UI showing the full agent loop — system prompt,
+each tool call with args + result, latency per step, the final structured
+envelope. Skipping setup is fine; the agent loop simply doesn't emit traces.
+
+### Self-host in one command
+
+```bash
+docker compose -f docker-compose.langfuse.yml up -d
+open http://localhost:3000
+```
+
+In the Langfuse UI: create an org, create a project, copy the **Public** and
+**Secret** API keys, then add them to your `.env`:
+
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=http://localhost:3000
+```
+
+Restart `uvicorn` and the next `/ask` request will appear in the Langfuse
+UI's *Tracing* tab.
+
+### Or use Langfuse Cloud
+
+Sign up at https://cloud.langfuse.com → create a project → copy keys →
+set `LANGFUSE_HOST=https://cloud.langfuse.com`. No Docker needed.
+
+The vendored `docker-compose.langfuse.yml` is Langfuse's official self-host
+stack (6 services: web, worker, postgres, clickhouse, redis, minio). Default
+secrets are sufficient for local prototype use — see the file's header for
+the production-hardening note.
+
+---
+
 ## Repository layout
 
 ```
