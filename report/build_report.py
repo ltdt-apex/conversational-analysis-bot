@@ -201,6 +201,11 @@ def section_problem_framing(doc):
     Bullet(doc, "Answers cite concrete conversation examples whenever the question implies evidence.")
     Bullet(doc, "The system shows a deliberate analytical / agent workflow rather than a single direct prompt.")
 
+    H2(doc, "Terminology")
+    Bullet(doc, "Turn — one message in a conversation, either by the customer or the support agent. Each row in the raw CSV is one turn.")
+    Bullet(doc, "Conversation — a single back-and-forth thread between one customer and one support agent, made up of ~10–18 turns.")
+    Bullet(doc, "Topic — the product or service the customer is calling about (e.g. Refund, Wallet, Audit Logs). We later group these into 15 broader categories.")
+
 
 def section_dataset_handling(doc, stats, tax_doc):
     H1(doc, "2. Dataset preprocessing")
@@ -223,7 +228,43 @@ def section_dataset_handling(doc, stats, tax_doc):
       f"{stats['distinct_prefixes']} distinct cleaned sentences, which means "
       "the data is highly templated. We exploit this in the next step."
     )
-    H2(doc, "2.2 Labels and aggregations we add to each turn")
+    H2(doc, "2.2 Assumptions")
+    P(doc,
+      "Key facts about the data, and how each one informs the design:"
+    )
+    Bullet(doc,
+      "Only ~426 distinct cleaned sentences exist across 42,000 turns — "
+      "so we label each distinct sentence once and copy the labels onto "
+      "every matching turn, ~100× cheaper than labelling each turn "
+      "separately."
+    )
+    Bullet(doc,
+      "Per-turn timestamps are noisy (not monotonic within a "
+      "conversation) — so we use the turn index column for ordering and "
+      "the earliest timestamp as the conversation's start time."
+    )
+    Bullet(doc,
+      "Only the cleaned leading sentence of each turn carries signal; "
+      "the trailing characters are random gibberish — so cleaning is just "
+      "'keep everything up to the last sentence-ending punctuation', no "
+      "fancy parsing needed."
+    )
+    Bullet(doc,
+      "Each customer maps to exactly one conversation — so customer-level "
+      "views and conversation-level views are equivalent; no extra "
+      "deduplication needed."
+    )
+    Bullet(doc,
+      f"Most agents only appear in one conversation "
+      f"({stats['agents_by_conv_count'].get(1, 0):,} of "
+      f"{stats['distinct_agents']:,} handle just 1; "
+      f"{stats['agents_by_conv_count'].get(2, 0)} handle 2; none handle "
+      "3+) — so agent-coaching answers surface concrete example "
+      "interactions rather than statistical rankings (which would have "
+      "too little data per agent to be reliable)."
+    )
+
+    H2(doc, "2.3 Labels and aggregations we add to each turn")
     P(doc,
       "Because there are only ~426 distinct cleaned sentences, we send each "
       "of those once to a cheap, fast model (Claude Haiku) and ask it to "
@@ -241,7 +282,7 @@ def section_dataset_handling(doc, stats, tax_doc):
     Bullet(doc, "Per-conversation: overall customer sentiment, a turn-by-turn sentiment trajectory, whether the issue was resolved, whether escalation happened, the conversation's topic, and the agent's average empathy.")
     Bullet(doc, "Per-agent: how many conversations they handled, average customer sentiment, average empathy, resolution rate, escalation rate, and which topics they handle most.")
 
-    H2(doc, "2.3 Topic extraction (derived once, frozen)")
+    H2(doc, "2.4 Topic extraction (derived once, frozen)")
     P(doc,
       "Every conversation opens with a customer message that follows one of "
       "nine fixed sentence patterns, with the topic baked into the wording:"
@@ -268,17 +309,7 @@ def section_dataset_handling(doc, stats, tax_doc):
     for c in tax_doc["categories"]:
         n = sum(1 for v in tax_doc["slot_to_category"].values() if v == c["id"])
         rows.append([c["id"], c["label"], str(n)])
-    Table(doc, ["Category id", "Display label", "# slots mapped"], rows, col_widths=[2.0, 2.3, 1.0])
-
-    H2(doc, "2.4 Key assumptions")
-    Bullet(doc, "Per-turn timestamps are unreliable (not monotonic within a conversation). turn_index is authoritative for order; conversation_start_ts = min(turn.timestamp).")
-    Bullet(doc, "Only the cleaned prefix carries analytical signal; trailing gibberish is dropped.")
-    Bullet(doc, "Each conversation has a unique customer_name (1:1 with conv_id).")
-    Bullet(doc,
-      f"Agents are sparsely distributed: {stats['agents_by_conv_count'].get(1, 0):,} agents "
-      f"handle exactly 1 conversation, {stats['agents_by_conv_count'].get(2, 0)} handle 2, none handle 3+ "
-      "(3,000 conversations / 2,987 agents = 1.004 avg). Implication: agent-coaching answers prioritise concrete example interactions over statistical rankings."
-    )
+    Table(doc, ["Category id", "Display label", "# patterns mapped"], rows, col_widths=[2.0, 2.3, 1.0])
 
     H2(doc, "2.5 Distributions after preparation")
     Bullet(doc,
@@ -294,6 +325,29 @@ def section_dataset_handling(doc, stats, tax_doc):
       "Agent empathy (agent turns only): "
       + ", ".join(f"{k}={v:,}" for k, v in stats["empathy_agent_only"].items())
       + " — 0 dismissive agent turns reflects the uniformly polite synthetic data."
+    )
+
+    H2(doc, "2.6 Preprocessed database schema")
+    P(doc,
+      "Three tables plus a session-memory table. Every column on the right "
+      "is what the agent's tools read from at query time."
+    )
+    schema_rows = [
+        ["turns",
+         "conv_id, turn_index, timestamp, role, text_raw, text_clean, text_clean_en, language, customer_name, agent_name, sentiment_label, sentiment_score, intent, empathy_signal, is_escalation, contains_pii"],
+        ["conversations",
+         "conv_id, customer_name, agent_name, start_ts, end_ts, turn_count, topic, customer_sentiment_overall, sentiment_trajectory, resolution_flag, escalation_flag, agent_empathy_mean, contains_pii_any"],
+        ["agents",
+         "agent_name, conv_count, avg_customer_sentiment, empathy_mean, resolution_rate, escalation_rate, top_topics"],
+        ["sessions",
+         "session_id, turn_idx, created_at, expires_at, question, answer_json"],
+    ]
+    Table(doc, ["Table", "Columns"], schema_rows, col_widths=[1.3, 5.0])
+    P(doc,
+      "The vector index (used for semantic search) lives outside the "
+      "relational database — one document per conversation, with "
+      "conv_id, topic, agent_name, language, sentiment, and escalation "
+      "flag attached as metadata so retrieval can be filtered."
     )
 
 
@@ -396,68 +450,215 @@ def section_agent_flow(doc):
       "repeat). The flow looks like below."
     )
     Code(doc,
-        "POST /ask\n"
+        "POST /ask  ◄── analyst question (+ optional session_id)\n"
         "  │\n"
         "  ▼\n"
-        "memory.load_recent(session_id, n=3)        # 24h TTL, PII-redacted\n"
+        "Load recent session memory (last 3 turns, 24h TTL, PII-redacted)\n"
         "  │\n"
         "  ▼\n"
-        "Planner (Sonnet 4.6, tool-use loop)        # max 8 iterations\n"
-        "  │  ├─ system prompt: taxonomy thumbnail + bilingual rules + 'examples over caveats'\n"
-        "  │  ├─ tools: query_conversations, query_agents, semantic_search,\n"
-        "  │  │         get_trajectory, get_conversation, list_topics\n"
-        "  │  └─ on each turn: read tool result, decide next tool, or call emit_answer\n"
+        "Agent loop (Sonnet 4.6, max 8 iterations):\n"
+        "  • think    — decide next tool based on question + prior tool results\n"
+        "  • act      — call one of the six tools\n"
+        "  • observe  — read the tool's structured output\n"
+        "  • repeat until ready to answer, then call emit_answer\n"
         "  │\n"
         "  ▼\n"
-        "emit_answer ─► AnswerEnvelope {answer, evidence[], tool_calls[],\n"
-        "                                reasoning_brief, uncertainty}\n"
+        "emit_answer  ─► structured AnswerEnvelope\n"
+        "                {answer, evidence[], tool_calls[],\n"
+        "                 reasoning_brief, uncertainty}\n"
         "  │\n"
         "  ▼\n"
-        "memory.save_turn(...)\n"
-        "  │\n"
-        "  ▼\n"
-        "AskResponse{session_id, envelope} → caller"
-    )
-    H2(doc, "The six tools and what each unblocks")
-    rows = [
-        ["query_conversations",
-         "Counts, ranks, or averages metrics across conversations, optionally filtered by date, topic, sentiment, or agent.",
-         "Lets the agent answer 'how many', 'top N', and 'compare over time' questions — e.g. ranking topics by negative sentiment in a given month."],
-        ["query_agents",
-         "Same as above but at the agent level — ranks agents by empathy, resolution rate, escalation rate, and so on.",
-         "Lets the agent answer 'which agent / how does agent X compare' questions — e.g. surfacing the lowest-empathy agents for a coaching review."],
-        ["semantic_search",
-         "Finds conversations whose meaning matches a free-form query, in either English or Hindi/Hinglish.",
-         "Lets the agent retrieve example conversations as evidence even when no exact word match exists — e.g. 'show me cases where the customer was rushed' returning Hinglish urgency phrases."],
-        ["get_trajectory",
-         "Returns how customer sentiment changed turn-by-turn within one specific conversation.",
-         "Lets the agent narrate the emotional arc of a single conversation — e.g. spotting when frustration peaked and whether it was resolved by the end."],
-        ["get_conversation",
-         "Returns the full transcript of one conversation, with both original and translated text.",
-         "Lets the agent quote verbatim from a specific conversation as supporting evidence — typically used right after semantic_search has identified an interesting case."],
-        ["list_topics",
-         "Returns the list of the 15 topic categories the system knows about, with how many conversations fall under each.",
-         "Lets the agent discover which topic labels are valid filter values before composing other queries — and gives the analyst a quick map of the dataset."],
-    ]
-    Table(doc, ["Tool", "What it does", "What it unblocks"], rows, col_widths=[1.4, 2.5, 2.6])
-
-    H2(doc, "Worked example: agents needing coaching")
-    P(doc,
-      "On this question the agent ran 5 tool calls in ~75s: rank agents by "
-      "empathy → semantic search for low-empathy conversations → drill into "
-      "two specific conversations → cross-reference the pattern. The final "
-      "answer named three specific agents and quoted both English and "
-      "Hinglish customer turns as evidence."
+        "Save turn to session memory → return AnswerEnvelope to caller"
     )
 
-    H2(doc, "Design choice: single-agent over multi-agent")
+    H2(doc, "Responsibilities and data flow")
     P(doc,
-      "One agent rather than an orchestrator + specialised sub-agents. The "
-      "task doesn't need specialisation — the same model can decide what to "
-      "fetch, read the result, and write the synthesis — and keeping it in "
-      "one continuous context avoids handoff loss and extra LLM round trips. "
-      "The natural extension when richer agency is needed is a critic "
-      "agent (Section 8)."
+      "The agent and its tools have clearly separated jobs and a typed "
+      "boundary between them:"
+    )
+    Bullet(doc,
+      "Agent — given the analyst's question, decides which tools to call "
+      "in what order, gathers their results in its working context, then "
+      "writes the final structured answer. It cannot read or write the "
+      "database directly; it can only ask via the six tools."
+    )
+    Bullet(doc,
+      "Tools — read-only, side-effect-free functions that each answer one "
+      "kind of data question (aggregate, semantic search, single-"
+      "conversation lookup, etc.). Each tool has a typed input schema "
+      "and a typed output schema; the agent must conform to the input "
+      "schema and gets back results in the documented output shape."
+    )
+    Bullet(doc,
+      "Return envelope (what the caller gets back) — the agent's final "
+      "response is always a structured AnswerEnvelope with fields: "
+      "`answer` (prose, 1-3 paragraphs), `evidence` (list of "
+      "{conv_id, quote, relevance, similarity}), `tool_calls` (the trace "
+      "of which tools were called with what arguments, for transparency), "
+      "`reasoning_brief` (one sentence describing how the answer was "
+      "reached), and `uncertainty` (optional caveat)."
+    )
+
+    H2(doc, "The six tools")
+    P(doc,
+      "Each tool's input format, output format, and a representative "
+      "example call/response. Inputs and outputs are JSON-validated; the "
+      "agent gets back a typed object it can quote from directly."
+    )
+
+    # --- query_conversations ---
+    P(doc, "query_conversations", bold=True)
+    P(doc, "Counts, ranks, or averages over the conversations table. Either returns aggregate rows (when group_by is set) or raw conversation rows.")
+    Code(doc,
+        "Input:\n"
+        "  {month?, date_from?, date_to?, topic?, sentiment_min?,\n"
+        "   sentiment_max?, escalation_flag?, resolution_flag?, language?,\n"
+        "   agent_name?, group_by?, metrics?, order_by?, order?, limit?}\n"
+        "\n"
+        "Output:\n"
+        "  list of rows. If group_by set:\n"
+        "    [{group_key, count, avg_sentiment?, avg_empathy?,\n"
+        "      escalation_rate?, resolution_rate?}, ...]\n"
+        "  Otherwise:\n"
+        "    [{conv_id, customer_name, agent_name, start_ts, end_ts,\n"
+        "      turn_count, topic, customer_sentiment_overall, ...}]\n"
+        "\n"
+        "Example call:\n"
+        "  query_conversations(month='2025-11', sentiment_max=-0.1,\n"
+        "                      group_by='topic',\n"
+        "                      metrics=['count', 'avg_sentiment'],\n"
+        "                      order_by='count', limit=5)\n"
+        "Example output:\n"
+        "  [{group_key:'account_auth', count:44, avg_sentiment:-0.273},\n"
+        "   {group_key:'developer_platform', count:35, avg_sentiment:-0.285},\n"
+        "   {group_key:'healthcare_services', count:31, avg_sentiment:-0.298},\n"
+        "   ...]"
+    )
+
+    # --- query_agents ---
+    P(doc, "query_agents", bold=True)
+    P(doc, "Ranks and filters across the per-agent table.")
+    Code(doc,
+        "Input:\n"
+        "  {min_conv_count?, sort_by?, order?, limit?}\n"
+        "    sort_by ∈ {empathy_mean, resolution_rate,\n"
+        "               avg_customer_sentiment, escalation_rate, conv_count}\n"
+        "\n"
+        "Output:\n"
+        "  [{agent_name, conv_count, avg_customer_sentiment,\n"
+        "    empathy_mean, resolution_rate, escalation_rate,\n"
+        "    top_topics}, ...]\n"
+        "\n"
+        "Example call:\n"
+        "  query_agents(min_conv_count=2, sort_by='empathy_mean',\n"
+        "               order='asc', limit=3)\n"
+        "Example output:\n"
+        "  [{agent_name:'AgentGCVV', conv_count:2, empathy_mean:0.615,\n"
+        "    avg_customer_sentiment:-0.108, ...},\n"
+        "   {agent_name:'AgentOYYZ', conv_count:2, empathy_mean:0.615, ...},\n"
+        "   {agent_name:'AgentNWGB', conv_count:2, empathy_mean:0.647, ...}]"
+    )
+
+    # --- semantic_search ---
+    P(doc, "semantic_search", bold=True)
+    P(doc, "Returns conversations whose meaning matches the query, multilingual.")
+    Code(doc,
+        "Input:\n"
+        "  {query, k?, topic?, agent_name?, language?,\n"
+        "   sentiment_min?, sentiment_max?, escalation_flag?}\n"
+        "\n"
+        "Output:\n"
+        "  [{conv_id, similarity, document_excerpt, topic,\n"
+        "    agent_name, customer_sentiment_overall,\n"
+        "    language, escalation_flag}, ...]\n"
+        "\n"
+        "Example call:\n"
+        "  semantic_search(query='customer feeling rushed about travel',\n"
+        "                  k=3)\n"
+        "Example output:\n"
+        "  [{conv_id:'C0008812', similarity:0.61,\n"
+        "    document_excerpt:'[customer] Thoda jaldi please, flight\n"
+        "                     in 2 hours.', topic:'travel_transport',\n"
+        "    language:'hi', ...}, ...]"
+    )
+
+    # --- get_trajectory ---
+    P(doc, "get_trajectory", bold=True)
+    P(doc, "Per-turn sentiment arc + intent / empathy for one conversation.")
+    Code(doc,
+        "Input:\n"
+        "  {conv_id}\n"
+        "\n"
+        "Output:\n"
+        "  {conv_id, topic, customer_sentiment_overall,\n"
+        "   resolution_flag, escalation_flag,\n"
+        "   customer_arc:[sentiment_scores_in_order],\n"
+        "   turns:[{turn_index, role, sentiment_label, sentiment_score,\n"
+        "           intent, empathy_signal, text_clean}, ...]}\n"
+        "\n"
+        "Example call:\n"
+        "  get_trajectory(conv_id='C0009233')\n"
+        "Example output:\n"
+        "  {conv_id:'C0009233', topic:'promotions_vouchers',\n"
+        "   customer_sentiment_overall:-0.42,\n"
+        "   customer_arc:[0.0, -0.6, -0.6, -0.6, -0.6, -0.7, 0.6, -0.6],\n"
+        "   turns:[{turn_index:0, role:'customer',\n"
+        "           sentiment_score:0.0, intent:'info_request',\n"
+        "           text_clean:'Mujhe Voucher ke baare mein help chahiye.'},\n"
+        "          ...]}"
+    )
+
+    # --- get_conversation ---
+    P(doc, "get_conversation", bold=True)
+    P(doc, "Full transcript of one conversation for verbatim quoting.")
+    Code(doc,
+        "Input:\n"
+        "  {conv_id, include_translation?}\n"
+        "\n"
+        "Output:\n"
+        "  {conv_id, customer_name, agent_name, start_ts, end_ts,\n"
+        "   topic, customer_sentiment_overall,\n"
+        "   resolution_flag, escalation_flag,\n"
+        "   turns:[{turn_index, role, timestamp, text_clean,\n"
+        "           text_clean_en?, language, sentiment_label,\n"
+        "           sentiment_score, intent, empathy_signal,\n"
+        "           is_escalation, contains_pii}, ...]}\n"
+        "\n"
+        "Example call:\n"
+        "  get_conversation(conv_id='C0003634', include_translation=True)\n"
+        "Example output:\n"
+        "  {conv_id:'C0003634', agent_name:'AgentVYJS',\n"
+        "   topic:'developer_platform', turns:[\n"
+        "     {turn_index:0, role:'customer',\n"
+        "      text_clean:'Hello, my API is not working as expected.',\n"
+        "      sentiment_label:'neg', sentiment_score:-0.4, ...},\n"
+        "     {turn_index:1, role:'agent',\n"
+        "      text_clean:'I understand this is frustrating. \"\n"
+        "                 \"I'm investigating now.', ...},\n"
+        "     ...]}"
+    )
+
+    # --- list_topics ---
+    P(doc, "list_topics", bold=True)
+    P(doc, "The 15 topic categories with how many conversations fall under each.")
+    Code(doc,
+        "Input:\n"
+        "  {with_examples?}\n"
+        "\n"
+        "Output:\n"
+        "  [{id, label, description, count_in_dataset,\n"
+        "    example_conv_id?}, ...]\n"
+        "\n"
+        "Example call:\n"
+        "  list_topics(with_examples=False)\n"
+        "Example output:\n"
+        "  [{id:'payments_wallet', label:'Payments & Wallet',\n"
+        "    description:'Issues related to digital wallet, UPI \"\n"
+        "                \"transactions, FASTag, and payment failures.',\n"
+        "    count_in_dataset:177},\n"
+        "   {id:'billing_refunds', label:'Billing & Refunds',\n"
+        "    count_in_dataset:220, ...},\n"
+        "   ...]"
     )
 
 
@@ -722,13 +923,16 @@ def section_limitations_and_improvements(doc):
 
     P(doc, "2. A larger eval set with expected answers.", bold=True)
     P(doc,
-      "The current evaluation set has only 15 questions and no expected "
-      "answer per question, so it only checks that the right tools were "
-      "called and that some evidence came back — not whether the actual "
-      "answer is correct. With a gold-standard expected answer per "
-      "question, an LLM-as-judge could score completion rate directly "
-      "(does the actual answer cover the expected content?), and the eval "
-      "would catch quality regressions rather than just behaviour changes."
+      "Because of the time limit, the eval set is only 15 questions with "
+      "no expected answer per question. To score quality with what was "
+      "available, the harness checks whether the expected tool was called "
+      "and whether the expected keywords appear in the answer — a "
+      "reasonable proxy but not a direct measure of whether the answer is "
+      "actually right. With more time the next step is to craft a bigger "
+      "eval set with a proper expected answer per question, then use an "
+      "LLM-as-judge to score completion rate directly (does the actual "
+      "answer cover the expected content?) so we can run a true "
+      "regression test and read the bot's correctness rate end-to-end."
     )
 
     P(doc, "3. Production-grade setup.", bold=True)
