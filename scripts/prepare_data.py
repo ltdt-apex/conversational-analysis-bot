@@ -27,8 +27,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.config import Config  # noqa: E402
 from backend.db import connect, init_schema, transaction  # noqa: E402
-from backend.text import clean_prefix  # noqa: E402
-from backend import taxonomy as tax  # noqa: E402
+from backend.preprocessing.text import clean_prefix  # noqa: E402
+from backend.preprocessing import taxonomy as tax  # noqa: E402
 
 STAGES = ["ingest_raw", "taxonomy", "classify", "rollups", "embed"]
 
@@ -183,7 +183,7 @@ def stage_classify(
     ``--force`` is set. After classification the side-table is JOIN-back-copied
     onto the ``turns`` table so downstream rollups can avoid joins.
     """
-    from backend import classifier  # lazy — keeps anthropic out of import path otherwise
+    from backend.preprocessing import classifier  # lazy — keeps anthropic out of import path otherwise
 
     with connect(cfg.sqlite_path) as conn:
         init_schema(conn)
@@ -282,12 +282,12 @@ def _propagate_to_turns(conn) -> None:
 
 
 def stage_rollups(cfg: Config, *, force: bool = False, **_: object) -> None:
-    from backend.rollups import run as _run_rollups
+    from backend.preprocessing.rollups import run as _run_rollups
     _run_rollups(cfg, force=force)
 
 
 def stage_embed(cfg: Config, *, force: bool = False, **_: object) -> None:
-    from backend.embed import run as _run_embed
+    from backend.preprocessing.embed import run as _run_embed
     _run_embed(cfg, force=force)
 
 

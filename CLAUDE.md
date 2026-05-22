@@ -94,11 +94,19 @@ Streamlit UI ─► FastAPI /ask ─► Planner agent (Claude Sonnet 4.6, tool-u
 ├── scripts/
 │   └── prepare_data.py           (offline preprocessing pipeline)
 ├── backend/
-│   ├── api.py                    (FastAPI)
-│   ├── agent.py                  (Planner + Synthesizer)
-│   ├── tools.py                  (the 6 tool functions)
-│   ├── memory.py                 (session memory)
-│   └── schemas.py                (Pydantic models for the response envelope)
+│   ├── config.py                 (env-driven Config; shared)
+│   ├── db.py                     (SQLite schema + connection; shared)
+│   ├── schemas.py                (Pydantic models; shared)
+│   ├── api.py                    (FastAPI; serving)
+│   ├── agent.py                  (Planner-Synthesizer loop; serving)
+│   ├── tools.py                  (the 6 tool functions; serving)
+│   ├── memory.py                 (session memory; serving)
+│   └── preprocessing/            (offline batch pipeline)
+│       ├── text.py               (prefix cleaner)
+│       ├── taxonomy.py           (slot extraction + LLM grouping)
+│       ├── classifier.py         (per-prefix Haiku classifier)
+│       ├── rollups.py            (conversation + agent aggregations)
+│       └── embed.py              (ChromaDB seeding)
 ├── ui/
 │   └── app.py                    (Streamlit chat)
 └── eval/
@@ -165,9 +173,9 @@ last-resort, not a default.
 
 ## Future improvements (note for the report's "Next improvements" section)
 
-- **Generalise topic-slot extraction.** Current `backend/taxonomy.py` uses
-  regex templates fitted to the Syncora.ai synthetic data (8 templates ×
-  51 slot values, 100% coverage on the shipped CSV). On real, free-form
+- **Generalise topic-slot extraction.** Current `backend/preprocessing/taxonomy.py`
+  uses regex templates fitted to the Syncora.ai synthetic data (8 templates
+  × 51 slot values, 100% coverage on the shipped CSV). On real, free-form
   customer openings this would not generalise. Plug-in points already exist
   behind `extract_slot()`; the candidate replacements are:
   - LLM-based slot identification (Claude reads each opener and emits the
