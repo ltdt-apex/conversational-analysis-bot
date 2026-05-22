@@ -328,7 +328,8 @@ def section_dataset_handling(doc, stats, tax_doc):
       "bank is fitted to Syncora.ai's synthetic templates; on real free-form "
       "customer support text we would need an LLM-based opener parser "
       "instead. The plug-in point already exists at "
-      "backend.taxonomy.extract_slot() and Section 9 names two candidate "
+      "backend.preprocessing.taxonomy.extract_slot() and Section 9 names two "
+      "candidate "
       "replacements."
     )
     rows = []
@@ -383,7 +384,7 @@ def section_system_design(doc):
     )
     H2(doc, "Components")
     Bullet(doc, "scripts/prepare_data.py — staged pipeline (ingest_raw, taxonomy, classify, rollups, embed). Every stage is idempotent and resumable.")
-    Bullet(doc, "backend/text.py + taxonomy.py + classifier.py + rollups.py + embed.py — one file per preparation stage; cleanly testable in isolation.")
+    Bullet(doc, "backend/preprocessing/ (text.py + taxonomy.py + classifier.py + rollups.py + embed.py) — one file per offline preparation stage; cleanly testable in isolation. Lives in its own subpackage so the offline-vs-serving boundary is explicit at import time.")
     Bullet(doc, "backend/tools.py — the six tool functions, each with Pydantic input/output schemas. Tool definitions for Anthropic's API are auto-generated from the Pydantic models.")
     Bullet(doc, "backend/agent.py — single Claude Sonnet 4.6 tool-use loop that emits a structured AnswerEnvelope via a synthetic emit_answer tool.")
     Bullet(doc, "backend/api.py — FastAPI POST /ask returning AnswerEnvelope; auto-OpenAPI at /docs.")
@@ -719,7 +720,7 @@ def section_bonus_extensions(doc):
 def section_limitations(doc):
     H1(doc, "8. Limitations")
     Bullet(doc,
-      "Topic-slot extraction is dataset-fitted. backend/taxonomy.py uses 8 "
+      "Topic-slot extraction is dataset-fitted. backend/preprocessing/taxonomy.py uses 8 "
       "regex templates derived by inspection of the Syncora.ai openings; on "
       "free-form real-world customer openings this would not generalise. "
       "Plug-in points exist behind extract_slot() for an LLM-based "
@@ -879,18 +880,19 @@ def section_appendix(doc):
         "├── report/report.docx        # final DOCX submission artifact\n"
         "├── scripts/prepare_data.py   # offline pipeline orchestrator\n"
         "├── backend/\n"
-        "│   ├── config.py             # env-driven Config\n"
-        "│   ├── db.py                 # SQLite schema + migrations\n"
-        "│   ├── text.py               # 2-pass prefix cleaner (terminator + wordfreq)\n"
-        "│   ├── taxonomy.py           # slot extraction + LLM grouping + YAML load/save\n"
-        "│   ├── classifier.py         # Haiku batch classifier (sentiment/intent/PII/EN/lang)\n"
-        "│   ├── rollups.py            # conversations + agents aggregations\n"
-        "│   ├── embed.py              # ChromaDB seeding (multilingual, cosine)\n"
-        "│   ├── tools.py              # 6 tool functions for the agent\n"
-        "│   ├── schemas.py            # Pydantic I/O models for every tool + envelope\n"
-        "│   ├── memory.py             # session memory + PII redaction\n"
-        "│   ├── agent.py              # planner-synthesizer loop (Sonnet 4.6)\n"
-        "│   └── api.py                # FastAPI POST /ask\n"
+        "│   ├── config.py             # env-driven Config (shared)\n"
+        "│   ├── db.py                 # SQLite schema + migrations (shared)\n"
+        "│   ├── schemas.py            # Pydantic I/O models (shared)\n"
+        "│   ├── tools.py              # 6 tool functions for the agent (serving)\n"
+        "│   ├── memory.py             # session memory + PII redaction (serving)\n"
+        "│   ├── agent.py              # planner-synthesizer loop (serving)\n"
+        "│   ├── api.py                # FastAPI POST /ask (serving)\n"
+        "│   └── preprocessing/        # offline batch pipeline\n"
+        "│       ├── text.py           # 2-pass prefix cleaner (terminator + wordfreq)\n"
+        "│       ├── taxonomy.py       # slot extraction + LLM grouping + YAML load/save\n"
+        "│       ├── classifier.py     # Haiku batch classifier (sentiment/intent/PII/EN/lang)\n"
+        "│       ├── rollups.py        # conversations + agents aggregations\n"
+        "│       └── embed.py          # ChromaDB seeding (multilingual, cosine)\n"
         "├── ui/app.py                 # Streamlit analyst chat\n"
         "├── eval/\n"
         "│   ├── questions.yaml        # 15 hand-crafted Q/A pairs\n"

@@ -22,7 +22,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from backend import schemas as S
-from backend import taxonomy as tax
+from backend.preprocessing import taxonomy as tax
 from backend.config import Config
 from backend.db import connect
 

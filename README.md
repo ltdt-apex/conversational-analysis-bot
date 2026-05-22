@@ -116,7 +116,7 @@ Documented in `.env.example`. The only required variable is
 ├── README.md                 # this file
 ├── report/                   # DOCX/PDF deliverable + assets
 ├── scripts/prepare_data.py   # offline pipeline (idempotent, resumable)
-├── backend/                  # FastAPI app, agent loop, tools, memory
+├── backend/                  # serving (api/agent/tools/memory) + preprocessing/ subpackage
 ├── ui/app.py                 # Streamlit analyst chat
 ├── eval/                     # ~15 Q/A pairs and the eval runner
 ├── examples/                 # sample curl requests and recorded outputs

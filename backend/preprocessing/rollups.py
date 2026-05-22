@@ -38,7 +38,7 @@ from statistics import fmean
 
 from backend.config import Config
 from backend.db import connect, init_schema, transaction
-from backend import taxonomy as tax
+from backend.preprocessing import taxonomy as tax
 
 
 # Per-spec empathy score mapping. 'na' (typically customer turns) is excluded
