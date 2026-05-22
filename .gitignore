@@ -26,9 +26,6 @@ data/chroma/
 data/checkpoints/
 data/topic_taxonomy.yaml.bak
 
-# Keep raw dataset out of git (23MB) — README documents how to obtain it
-data/cs_conversations.csv
-
 # Eval outputs
 eval/results/
 

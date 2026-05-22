@@ -88,7 +88,7 @@ Streamlit UI ─► FastAPI /ask ─► Planner agent (Claude Sonnet 4.6, tool-u
 ├── .env.example                  (lists required env vars, no real values)
 ├── pyproject.toml or requirements.txt
 ├── data/
-│   ├── cs_conversations.csv      (input; gitignored if too large)
+│   ├── cs_conversations.csv      (input; committed for one-command setup)
 │   ├── processed.db              (SQLite, gitignored)
 │   └── chroma/                   (vector store, gitignored)
 ├── scripts/

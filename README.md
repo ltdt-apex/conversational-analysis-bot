@@ -19,16 +19,14 @@ uv sync                          # or: pip install -e .
 cp .env.example .env
 $EDITOR .env                     # set ANTHROPIC_API_KEY
 
-# 3. Obtain the dataset (see "Dataset" below) and place it at:
-#    data/cs_conversations.csv
-
-# 4. Run the offline preparation pipeline (one-shot, resumable)
+# 3. Run the offline preparation pipeline (one-shot, resumable).
+#    The raw dataset ships in the repo at data/cs_conversations.csv (~23 MB).
 uv run python scripts/prepare_data.py
 
-# 5. Start the API
+# 4. Start the API
 uv run uvicorn backend.api:app --reload --port 8000
 
-# 6. In another terminal, start the analyst UI
+# 5. In another terminal, start the analyst UI
 uv run streamlit run ui/app.py
 ```
 
@@ -42,8 +40,8 @@ Primary source: **Customer Support Conversation Dataset — Syncora.ai** on Kagg
 We use the 3,000-conversation sample shipped with the assignment as
 `data/cs_conversations.csv` (41,965 turn rows, Aug–Dec 2025).
 
-The raw CSV is not committed (`.gitignore`'d at 23 MB). Place it at
-`data/cs_conversations.csv` before running the prep pipeline.
+The raw CSV (~23 MB) is committed to the repo for one-command setup —
+clone and run, no extra download step.
 
 Schema: `conv_id, turn_index, timestamp, role, text, customer_name, agent_name`.
 
