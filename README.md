@@ -4,8 +4,11 @@ Prototype that lets a contact-centre analyst ask analytical questions over a
 3,000-conversation customer-support dataset and get evidence-backed answers
 through an agent workflow.
 
-The raw dataset (~23 MB) ships in the repo at `data/cs_conversations.csv`,
-so no extra download is needed for either setup path below.
+The raw dataset (~23 MB) ships in the repo at `data/cs_conversations.csv`.
+The preprocessed artifacts (SQLite + ChromaDB, ~66 MB) also ship under
+`data/`, so the `prepare` step exits immediately on a fresh clone and the
+bot is fully usable seconds after `docker compose up`. No extra download
+is needed for either setup path below.
 
 ---
 

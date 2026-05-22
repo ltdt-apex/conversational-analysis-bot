@@ -17,12 +17,13 @@ env/
 .env.local
 .env.*.local
 
-# Data artifacts (large / regenerable)
-data/processed.db
+# Data artifacts.
+# Note: data/processed.db and data/chroma/ ARE committed so reviewers can
+# skip the ~5-minute preprocess step on first run. Only transient SQLite
+# WAL / journal files and checkpoint scratch are excluded.
 data/processed.db-journal
 data/processed.db-wal
 data/processed.db-shm
-data/chroma/
 data/checkpoints/
 data/topic_taxonomy.yaml.bak
 

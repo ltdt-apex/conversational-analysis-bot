@@ -27,13 +27,13 @@ env/
 .env.local
 .env.*.local
 
-# Generated data — the prepare service recreates these inside the mounted
-# volume; we don't want stale host copies in the build context.
-data/processed.db
+# Generated data: only the transient SQLite WAL / journal files and the
+# checkpoint scratch are excluded. data/processed.db and data/chroma/ are
+# committed (so reviewers can skip the preprocess step); they ride along
+# in the build context but the runtime bind-mount on ./data still wins.
 data/processed.db-journal
 data/processed.db-wal
 data/processed.db-shm
-data/chroma/
 data/checkpoints/
 
 # Eval / report artifacts
