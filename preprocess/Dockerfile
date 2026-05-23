@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+#
+# convbot-prepare: one-shot offline preprocessing pipeline.
+# Runs preprocess/prepare_data.py to populate the SQLite + ChromaDB stores.
+# Exits when finished. Idempotent — finished stages skip on re-run.
+#
+# Deps are listed explicitly here (rather than via pyproject.toml) so each
+# Dockerfile is self-contained. Version constraints mirror pyproject; bump
+# them here whenever pyproject is bumped.
+
+FROM python:3.13-slim
+
+# uv is just used for its fast `pip install`. Smaller installs than plain pip.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/
+
+ENV PYTHONUNBUFFERED=1 \
+    HF_HOME=/root/.cache/huggingface
+
+WORKDIR /app
+
+# Preprocessing-specific deps: AI labelling + cleaning + embedding seed.
+RUN uv pip install --system --no-cache \
+        "anthropic>=0.40.0" \
+        "python-dotenv>=1.0.1" \
+        "pydantic>=2.9.0" \
+        "pyyaml>=6.0.2" \
+        "wordfreq>=3.1.1" \
+        "tqdm>=4.67.0" \
+        "tenacity>=9.0.0" \
+        "sentence-transformers>=3.3.0" \
+        "chromadb>=0.5.20"
+
+COPY backend/ backend/
+COPY preprocess/ preprocess/
+# Raw dataset + frozen topic taxonomy ship in the image so a fresh prepare
+# run is self-contained even without the host-mounted data volume.
+COPY data/cs_conversations.csv data/cs_conversations.csv
+COPY data/topic_taxonomy.yaml data/topic_taxonomy.yaml
+
+CMD ["python", "preprocess/prepare_data.py"]

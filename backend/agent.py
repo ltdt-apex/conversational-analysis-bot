@@ -32,7 +32,7 @@ from anthropic import Anthropic
 from pydantic import BaseModel
 
 from backend import memory, observability, tools
-from backend.preprocessing import taxonomy as tax
+from preprocess import taxonomy as tax
 from backend.config import Config
 from backend.schemas import AnswerEnvelope, EvidenceItem, ToolCallTrace
 
