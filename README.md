@@ -18,9 +18,9 @@ Dockerfile with only the dependencies it needs:
 
 | Service | Dockerfile | Port | Role |
 |---|---|---|---|
-| `prepare` | `Dockerfile.prepare` | — | One-shot offline preprocessing |
-| `api` | `Dockerfile.api` | 8000 | FastAPI serving the agent loop |
-| `ui` | `Dockerfile.ui` | 8501 | Streamlit chat (slim — no torch/chromadb) |
+| `prepare` | `preprocess/Dockerfile` | — | One-shot offline preprocessing |
+| `api` | `backend/Dockerfile` | 8000 | FastAPI serving the agent loop |
+| `ui` | `ui/Dockerfile` | 8501 | Streamlit chat (slim — no torch/chromadb) |
 
 ```bash
 # 1. Configure secrets (.env is gitignored)
@@ -60,7 +60,7 @@ $EDITOR .env                     # set ANTHROPIC_API_KEY
 ### 3. Run the offline preprocessing pipeline
 
 ```bash
-uv run python scripts/prepare_data.py
+uv run python preprocess/prepare_data.py
 ```
 
 ### 4. Start the API and the UI

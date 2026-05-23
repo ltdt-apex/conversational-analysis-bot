@@ -87,30 +87,29 @@ Streamlit UI ─► FastAPI /ask ─► Planner agent (Claude Sonnet 4.6, tool-u
 ├── report/                       (DOCX/PDF deliverable + assets)
 ├── .env.example                  (lists required env vars, no real values)
 ├── pyproject.toml or requirements.txt
-├── Dockerfile.prepare            (image for the offline preprocessing service)
-├── Dockerfile.api                (image for the FastAPI serving service)
-├── Dockerfile.ui                 (image for the Streamlit chat service)
+├── preprocess/Dockerfile            (image for the offline preprocessing service)
+├── backend/Dockerfile                (image for the FastAPI serving service)
+├── ui/Dockerfile                 (image for the Streamlit chat service)
 ├── docker-compose.yml            (one-command stack for prepare + api + ui)
 ├── data/
 │   ├── cs_conversations.csv      (input; committed for one-command setup)
 │   ├── processed.db              (SQLite, gitignored)
 │   └── chroma/                   (vector store, gitignored)
-├── scripts/
-│   └── prepare_data.py           (offline preprocessing pipeline)
-├── backend/
+├── preprocess/                   (offline batch pipeline, separate from runtime)
+│   ├── prepare_data.py           (entry point; orchestrates the five stages)
+│   ├── text.py                   (prefix cleaner)
+│   ├── taxonomy.py               (slot extraction + LLM grouping)
+│   ├── classifier.py             (per-prefix Haiku classifier)
+│   ├── rollups.py                (conversation + agent aggregations)
+│   └── embed.py                  (ChromaDB seeding)
+├── backend/                      (runtime — agent + API; no preprocessing code)
 │   ├── config.py                 (env-driven Config; shared)
 │   ├── db.py                     (SQLite schema + connection; shared)
 │   ├── schemas.py                (Pydantic models; shared)
 │   ├── api.py                    (FastAPI; serving)
 │   ├── agent.py                  (Planner-Synthesizer loop; serving)
 │   ├── tools.py                  (the 6 tool functions; serving)
-│   ├── memory.py                 (session memory; serving)
-│   └── preprocessing/            (offline batch pipeline)
-│       ├── text.py               (prefix cleaner)
-│       ├── taxonomy.py           (slot extraction + LLM grouping)
-│       ├── classifier.py         (per-prefix Haiku classifier)
-│       ├── rollups.py            (conversation + agent aggregations)
-│       └── embed.py              (ChromaDB seeding)
+│   └── memory.py                 (session memory; serving)
 ├── ui/
 │   └── app.py                    (Streamlit chat)
 └── eval/
@@ -123,7 +122,7 @@ Streamlit UI ─► FastAPI /ask ─► Planner agent (Claude Sonnet 4.6, tool-u
 - [ ] README has setup steps that work from a clean clone.
 - [ ] `.env.example` lists every env var; no real keys in repo.
 - [ ] Sample requests + sample outputs included (curl examples in README, or `examples/` directory).
-- [ ] Dataset prep step is documented and reproducible (`python scripts/prepare_data.py`).
+- [ ] Dataset prep step is documented and reproducible (`python preprocess/prepare_data.py`).
 - [ ] All four example questions answerable end-to-end via the UI and the API.
 - [ ] Report covers every section listed in "Hard submission requirements" above.
 - [ ] Bonus extensions that were implemented are documented in the report with the required four points each (indexed/triggered/evidence/improvement for RAG; chosen/fit/evaluated for specialised agent; stored/retrieved/affects/privacy for memory).
@@ -177,7 +176,7 @@ last-resort, not a default.
 
 ## Future improvements (note for the report's "Next improvements" section)
 
-- **Generalise topic-slot extraction.** Current `backend/preprocessing/taxonomy.py`
+- **Generalise topic-slot extraction.** Current `preprocess/taxonomy.py`
   uses regex templates fitted to the Syncora.ai synthetic data (8 templates
   × 51 slot values, 100% coverage on the shipped CSV). On real, free-form
   customer openings this would not generalise. Plug-in points already exist

@@ -1,7 +1,7 @@
 # End-to-end stack — three services, three images, three Dockerfiles.
 #
 #   prepare  → convbot-prepare:latest   one-shot offline preprocessing
-#              (Dockerfile.prepare; runs scripts/prepare_data.py)
+#              (Dockerfile.prepare; runs preprocess/prepare_data.py)
 #   api      → convbot-api:latest       FastAPI on :8000
 #              (Dockerfile.api; backend.api:app)
 #   ui       → convbot-ui:latest        Streamlit on :8501 — slim image
@@ -20,7 +20,7 @@ services:
   prepare:
     build:
       context: .
-      dockerfile: Dockerfile.prepare
+      dockerfile: preprocess/Dockerfile
     image: convbot-prepare:latest
     env_file: .env
     volumes:
@@ -30,7 +30,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: backend/Dockerfile
     image: convbot-api:latest
     depends_on:
       prepare:
@@ -51,7 +51,7 @@ services:
   ui:
     build:
       context: .
-      dockerfile: Dockerfile.ui
+      dockerfile: ui/Dockerfile
     image: convbot-ui:latest
     depends_on:
       api:
