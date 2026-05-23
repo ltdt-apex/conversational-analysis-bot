@@ -4,11 +4,6 @@ Prototype that lets a contact-centre analyst ask analytical questions over a
 3,000-conversation customer-support dataset and get evidence-backed answers
 through an agent workflow.
 
-I committed the preprocessed artifacts (SQLite + ChromaDB, ~66 MB)
-under `data/` to make setup easier and skip the ~5-minute preprocess step
-on first run. You can delete `data/processed.db` and `data/chroma/` if
-you want to test the preprocess pipeline yourself.
-
 ---
 
 ## Setup — Docker (recommended)
@@ -22,8 +17,16 @@ Dockerfile with only the dependencies it needs:
 | `api` | `backend/Dockerfile` | 8000 | FastAPI serving the agent loop |
 | `ui` | `ui/Dockerfile` | 8501 | Streamlit chat (slim — no torch/chromadb) |
 
+The preprocess step take around 5 minute to generate labels (e.g. sentiment score) for fast data lookup in real step.
+
+To save time, I committed the preprocessed artifacts (SQLite + ChromaDB, ~66 MB)
+under `data/` to make setup easier and skip the ~5-minute preprocess step
+
+You can delete `data/processed.db` and `data/chroma/` if
+you want to test the preprocess step.
+
 ```bash
-# 1. Configure secrets (.env is gitignored)
+# 1. Configure API key (.env is gitignored)
 cp .env.example .env
 $EDITOR .env                     # set ANTHROPIC_API_KEY
 
@@ -50,7 +53,7 @@ curl -fsS http://localhost:8501/_stcore/health            # → ok
 uv sync                          # or: pip install -e .
 ```
 
-### 2. Configure secrets
+### 2. Configure API key
 
 ```bash
 cp .env.example .env
@@ -69,7 +72,7 @@ uv run python preprocess/prepare_data.py
 # Terminal 1 — API
 uv run uvicorn backend.api:app --reload --port 8000
 
-# Terminal 2 — analyst chat UI
+# Terminal 2 — UI
 uv run streamlit run ui/app.py
 ```
 
@@ -105,10 +108,6 @@ Response shape:
   }
 }
 ```
-
-A full set of recorded outputs across 15 sample questions (covering all four
-assignment example questions plus follow-ups in English and Hindi/Hinglish)
-lives in `eval/results-latest.json`.
 
 ---
 
