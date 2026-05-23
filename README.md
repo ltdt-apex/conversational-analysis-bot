@@ -4,11 +4,10 @@ Prototype that lets a contact-centre analyst ask analytical questions over a
 3,000-conversation customer-support dataset and get evidence-backed answers
 through an agent workflow.
 
-The raw dataset (~23 MB) ships in the repo at `data/cs_conversations.csv`.
-The preprocessed artifacts (SQLite + ChromaDB, ~66 MB) also ship under
-`data/`, so the `prepare` step exits immediately on a fresh clone and the
-bot is fully usable seconds after `docker compose up`. No extra download
-is needed for either setup path below.
+I committed the preprocessed artifacts (SQLite + ChromaDB, ~66 MB)
+under `data/` to make setup easier and skip the ~5-minute preprocess step
+on first run. You can delete `data/processed.db` and `data/chroma/` if
+you want to test the preprocess pipeline yourself.
 
 ---
 
