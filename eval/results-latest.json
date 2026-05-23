@@ -1,15 +1,15 @@
 {
-  "run_ts": "2026-05-21T02:06:21+00:00",
+  "run_ts": "2026-05-22T01:46:07+00:00",
   "grader_model": "claude-haiku-4-5-20251001",
   "summary": {
     "n_questions": 15,
     "pass_rate": 1.0,
     "partial_rate": 0.0,
     "fail_rate": 0.0,
-    "mean_latency_s": 38.43,
-    "median_latency_s": 37.48,
-    "p95_latency_s": 60.32,
-    "mean_grounding": 0.897,
+    "mean_latency_s": 29.58,
+    "median_latency_s": 28.42,
+    "p95_latency_s": 43.94,
+    "mean_grounding": 0.903,
     "pass_rate_by_category": {
       "aggregation": 1.0,
       "agent_ranking": 1.0,
@@ -30,12 +30,12 @@
       "category": "aggregation",
       "language": "en",
       "question": "What are the top 5 topics with the most negative customer sentiment in November 2025?",
-      "answer": "In November 2025, the five topics with the most negative average customer sentiment were:\n\n1. **Travel & Transport** — avg. sentiment **−0.18**, escalation rate **78%** (41 conversations)\n2. **Developer & Platform** — avg. sentiment **−0.165**, escalation rate **78%** (58 conversations)\n3. **Broadband & Connectivity** — avg. sentiment **−0.155**, escalation rate **80%** (10 conversations)\n4. **Number & SIM Management** — avg. sentiment **−0.153**, escalation rate **72%** (32 conversations)\n5. **Insurance & Claims** — avg. sentiment **−0.143**, escalation rate **56%** (16 conversations)\n\nAll five topics are in negative sentiment territory, and notably, four of them also carry very high escalation rates (72–80%), suggesting that customer frustration in these areas frequently required escalation. **Broadband & Connectivity** stands out with the highest escalation rate (80%) despite being the smallest group, while **Developer & Platform** has the highest raw volume of frustrated conversations (58 cases).",
+      "answer": "Here are the **top 5 topics with the most negative customer sentiment in November 2025**:\n\n| Rank | Topic | Avg. Sentiment | Escalation Rate | Conv. Count |\n|------|-------|---------------|-----------------|-------------|\n| 1 | 🚌 **Travel & Transport** | **-0.180** | 78% | 41 |\n| 2 | 💻 **Developer & Platform** | **-0.165** | 77.6% | 58 |\n| 3 | 📶 **Broadband & Connectivity** | **-0.155** | 80% | 10 |\n| 4 | 📱 **Number & SIM Management** | **-0.153** | 71.9% | 32 |\n| 5 | 🛡️ **Insurance & Claims** | **-0.143** | 56.3% | 16 |\n\n**Key takeaways:**\n\n- **Travel & Transport** tops the list with the worst average sentiment (-0.18), and a high 78% escalation rate — suggesting widespread frustration that agents struggle to resolve without escalating.\n- **Broadband & Connectivity**, while having fewer conversations (10), has the **highest escalation rate of all five (80%)**, meaning nearly every unhappy customer needed to be escalated.\n- **Developer & Platform** stands out as the highest-volume topic in this group (58 convs.) with consistently negative sentiment and a ~78% escalation rate — this may warrant a structural fix (e.g., better self-service docs or tooling).\n- **Insurance & Claims** is the least severe of the five, with a comparatively lower escalation rate (56.3%) suggesting some issues are still being resolved at the first point of contact.\n\nThese five topics should be prioritized for quality reviews, agent coaching, and potential process improvements heading into December.",
       "evidence_count": 0,
       "tools_used": [
         "query_conversations"
       ],
-      "latency_s": 11.8,
+      "latency_s": 11.59,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -50,7 +50,7 @@
         "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [],
-        "one_line_judgment": "All substantive claims (rankings, sentiment scores, escalation rates, conversation counts) are aggregate statistics grounded by the query_conversations tool call; no conversation-specific or verbatim claims requiring quotes are present."
+        "one_line_judgment": "All substantive claims are aggregate statistics (topic rankings, sentiment scores, escalation rates, conversation counts) grounded by the query_conversations tool call; no conversation-specific or verbatim claims requiring quotes are present."
       },
       "status": "pass",
       "error": null
@@ -60,12 +60,13 @@
       "category": "aggregation",
       "language": "en",
       "question": "Which topic has the highest escalation rate across the whole dataset?",
-      "answer": "**Payments & Wallet** has the highest escalation rate across the entire dataset at **77.4%** — meaning roughly 3 out of every 4 conversations on this topic were escalated. It edges out Billing & Refunds (74.5%) and Telecom Number Management (72.2%) to claim the top spot.\n\nThis is notable given that Payments & Wallet also has a solid volume of 177 conversations, so the high rate isn't just a statistical artifact of a tiny sample. Payment-related issues (failed transactions, wallet debits, refund delays) are inherently time-sensitive and frustrating for customers, which likely drives agents to escalate more frequently.",
-      "evidence_count": 0,
+      "answer": "**Payments & Wallet** has the highest escalation rate in the dataset at **77.4%** — meaning more than 3 out of every 4 conversations on this topic end up being escalated. It leads across all 15 topic categories, ahead of Billing & Refunds (74.5%) and Number & SIM Management (72.2%).\n\nThis is notable given its sizeable volume (177 conversations), suggesting a systemic issue rather than a statistical fluke. Common drivers appear to be duplicate charges and unresolved wallet transaction disputes where front-line agents lack the tools or authority to close the issue, prompting customers to demand escalation.",
+      "evidence_count": 1,
       "tools_used": [
-        "query_conversations"
+        "query_conversations",
+        "semantic_search"
       ],
-      "latency_s": 10.86,
+      "latency_s": 20.73,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -79,7 +80,7 @@
         "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [],
-        "one_line_judgment": "All substantive claims (topic name, escalation rates, conversation count, comparison rankings) are aggregate statistics grounded by the query_conversations tool call; no quotes required."
+        "one_line_judgment": "All substantive claims grounded: aggregate statistics by query_conversations tool call; specific conversation pattern supported by evidence quote."
       },
       "status": "pass",
       "error": null
@@ -89,7 +90,7 @@
       "category": "aggregation",
       "language": "en",
       "question": "How many conversations were marked resolved versus unresolved?",
-      "answer": "Out of 3,000 total conversations, **863 were marked as resolved** (≈28.8%) and **2,037 were marked as unresolved** (≈67.9%). This leaves approximately 100 conversations (~3.3%) with no resolution flag recorded.\n\nThe resolution rate is notably low at under 30%, suggesting that the majority of customer issues are not being fully closed within a single conversation. The topic with the highest absolute resolved count was **Account & Authentication** (119 resolved), while it also had the highest unresolved count (245), indicating it is both a high-volume and low-resolution-rate topic.",
+      "answer": "Across all 3,000 conversations in the dataset (August–November 2025):\n\n- **Resolved: 963 conversations (32.1%)**\n- **Unresolved: 2,037 conversations (67.9%)**\n\nThis means roughly 2 in 3 conversations were left unresolved — a notable finding that may warrant further investigation into root causes such as escalation patterns, topic difficulty, or agent support gaps.",
       "evidence_count": 0,
       "tools_used": [
         "query_conversations",
@@ -97,7 +98,7 @@
         "query_conversations",
         "query_conversations"
       ],
-      "latency_s": 31.95,
+      "latency_s": 14.95,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -111,7 +112,7 @@
         "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [],
-        "one_line_judgment": "All substantive aggregate claims are grounded by SQL tool calls; no conversation-specific quotes needed for statistical summaries."
+        "one_line_judgment": "All aggregate claims (3,000 conversations total, 963 resolved at 32.1%, 2,037 unresolved at 67.9%) are grounded by query_conversations tool calls; interpretive prose requires no grounding."
       },
       "status": "pass",
       "error": null
@@ -121,22 +122,19 @@
       "category": "agent_ranking",
       "language": "en",
       "question": "Which support agents may benefit from coaching on empathy or customer\ncommunication, with concrete evidence?",
-      "answer": "**Three agents stand out as priority coaching candidates**, identified by the combination of lowest empathy scores, most negative customer sentiment, zero resolution rates, and escalation-heavy conversations.\n\n**AgentRGPW** (empathy 0.67, customer sentiment –0.66, 0% resolution) handled a developer-platform case (C0007482) where the customer escalated three times in a row saying \"Still not fixed. Can you escalate?\" and even expressed time-critical urgency (\"Thoda jaldi please, flight in 2 hours\"). The agent's responses were entirely reactive and formulaic — cycling between \"I can help with that. May I have the registered email?\" and \"Main abhi verify kar rahi/raha hoon, kindly wait.\" — never acknowledging the urgency, never advancing toward resolution, and ending the case unresolved.\n\n**AgentDKUJ** (empathy 0.63, customer sentiment –0.61, 0% resolution, travel_transport) shows an almost identical pattern across a 16-turn conversation (C0014263). The customer reported a double billing charge (sentiment –0.8 at open) and requested escalation **five separate times**. The agent's go-to response, repeated four times word-for-word, was \"Main abhi verify kar rahi/raha hoon, kindly wait.\" — a holding phrase with no substantive follow-up. When a solution finally appeared at turn 15, it addressed a coupon rather than the duplicate charge, suggesting a mismatch in understanding the complaint.\n\n**AgentVYJS** (C0003634, developer_platform, sentiment –0.43) repeated the same two boilerplate phrases (\"I understand this is frustrating. I'm investigating now.\" / \"I'm sorry about the trouble. Let me check your account.\") across seven agent turns while the customer asked to escalate three times, including an urgent Hindi message. The case ended unresolved and escalated. **Coaching focus areas for all three**: active listening and personalised acknowledgement (vs. scripted loops), urgency recognition (especially bilingual cues), and structured escalation handling so repeated escalation requests actually trigger an action.",
+      "answer": "Three agents stand out as coaching candidates based on low empathy scores, poor resolution rates, and/or the worst customer sentiment outcomes in the dataset.\n\n**1. AgentAKBB — Lowest empathy (0.5/1.0), unresolved telecom complaint (C0009018)**\nThe customer opened with a clear urgency signal (\"UPI shows successful but I didn't get the service for International Pack\" / \"It's urgent. Please expedite.\") but received only procedural, mechanical responses — \"Please allow me a moment while I run some checks\" and \"Main abhi verify kar rahi/raha hoon, kindly wait\" — with no acknowledgement of the customer's distress. No empathy signal was logged across any agent turn. The case was not resolved and the customer left with a negative overall sentiment.\n\n**2. AgentATLM — Lowest empathy (0.5/1.0), escalated orders/delivery complaint (C0013493)**\nWhen the customer said \"Thoda jaldi please, flight in 2 hours\" (signalling time-critical urgency) and twice asked \"Still not fixed. Can you escalate?\", AgentATLM replied with the exact same boilerplate — \"Please allow me a moment while I run some checks\" — four times in a row, with no empathy acknowledgement. The conversation escalated, was not resolved, and ended with a negative sentiment of −0.29.\n\n**3. AgentQRGU — Worst customer sentiment (−0.67), escalated telecom complaint (C0003298)**\nDespite showing some empathetic language (\"I understand this is frustrating\"), the agent failed to convert that into action or resolution. The customer repeated \"Still not fixed. Can you escalate?\" three separate times and expressed time urgency twice (\"Thoda jaldi please, flight in 2 hours\"), yet the agent kept cycling back to acknowledgement phrases (\"Thanks for reaching out! I'm pulling up the details.\") without progressing to a solution. The case escalated and was not resolved, resulting in the single worst customer sentiment in the dataset (−0.67).\n\n**Coaching priorities:**\n- **Empathy-in-action**: All three agents acknowledge problems at best superficially. Coaching should focus on naming the customer's emotion explicitly before moving to process steps.\n- **Breaking boilerplate loops**: AgentATLM in particular repeated the same line verbatim. Agents need scripts for *escalating* their own response when a customer is stuck, not repeating the same phrase.\n- **Urgency triage**: Multiple customers signalled time pressure (flight departing, urgent payment). Agents need a clear protocol to fast-track or proactively offer escalation in these situations rather than waiting to be asked repeatedly.",
       "evidence_count": 3,
       "tools_used": [
         "query_agents",
-        "semantic_search",
         "query_agents",
-        "semantic_search",
-        "query_agents",
-        "get_conversation",
-        "get_conversation",
         "query_conversations",
         "query_conversations",
+        "query_conversations",
+        "get_conversation",
         "get_conversation",
         "get_conversation"
       ],
-      "latency_s": 75.39,
+      "latency_s": 49.23,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -147,11 +145,11 @@
       "evidence_pass": true,
       "grounding": {
         "grounding_score": 1.0,
-        "supported_claim_count": 11,
+        "supported_claim_count": 12,
         "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [],
-        "one_line_judgment": "All substantive claims are grounded by tool calls (agent metrics from query_agents) or direct evidence quotes from conversation retrieval."
+        "one_line_judgment": "All substantive claims are fully supported by SQL tool calls and/or verbatim evidence quotes from conversations."
       },
       "status": "pass",
       "error": null
@@ -161,18 +159,16 @@
       "category": "agent_ranking",
       "language": "en",
       "question": "Compare AgentNWGB and AgentBYTO on resolution rate and empathy.",
-      "answer": "**AgentNWGB vs AgentBYTO — Head-to-Head Comparison**\n\nBoth agents handled 2 conversations each, and they are tied on **resolution rate at 50%** (1 resolved, 1 unresolved each). The meaningful difference lies in **empathy**:\n\n| Metric | AgentNWGB | AgentBYTO |\n|---|---|---|\n| Conversations | 2 | 2 |\n| Resolution Rate | 50% | 50% |\n| Avg Empathy Score | **0.642** | **0.763** |\n\n**AgentBYTO shows noticeably stronger empathy** (+0.12 points, ~19% higher). Looking at the transcripts, AgentBYTO consistently acknowledged customer frustration and apologised proactively — e.g., responding to a high-urgency customer with *\"I'm sorry about the trouble. Let me check your account\"* and *\"I understand this is frustrating. I'm investigating now.\"* across multiple turns. Their best-scored conversation (financial products) reached an empathy mean of **0.81**.\n\nAgentNWGB also used empathetic language, but more intermittently — alternating between empathetic turns and more neutral/mechanical responses like *\"Main abhi verify kar rahi/raha hoon, kindly wait.\"* Their unresolved account-auth case (empathy mean 0.72) shows empathy was present but not enough to keep the customer satisfied or reach a resolution. Overall, **coaching AgentNWGB to sustain empathy consistently throughout a conversation** (rather than just at key moments) is the clearest development lever.",
-      "evidence_count": 2,
+      "answer": "**Summary Comparison**\n\n| Metric | AgentNWGB | AgentBYTO |\n|---|---|---|\n| Conversations | 2 | 2 |\n| Resolution Rate | 50% (1/2 resolved) | 50% (1/2 resolved) |\n| Avg. Empathy Score | 0.642 | 0.763 |\n| Avg. Customer Sentiment | −0.244 | −0.219 |\n\n**Resolution Rate** is identical for both agents at 50% — each resolved one of their two conversations. AgentNWGB resolved a delivery issue (C0001407) but failed to resolve an account/auth case (C0011964). AgentBYTO resolved a financial products case (C0012773) but not an account/auth case (C0010876).\n\n**Empathy** is where a clear difference emerges. AgentBYTO scores meaningfully higher (mean 0.763 vs. 0.642). In their conversations, AgentBYTO consistently deployed empathetic signals such as *\"I understand this is frustrating. I'm investigating now,\"* *\"I'm sorry about the trouble. Let me check your account,\"* and *\"Thanks for reaching out! I'm pulling up the details.\"* AgentNWGB did show some empathy (e.g., *\"I understand this is frustrating\"* in one turn), but many of their turns were scored as neutral (\"Please allow me a moment while I run some checks\"), dragging down the average. AgentBYTO is the stronger performer on the emotional/relational dimension.",
+      "evidence_count": 3,
       "tools_used": [
         "query_agents",
-        "query_conversations",
-        "query_conversations",
         "query_conversations",
         "query_conversations",
         "get_conversation",
         "get_conversation"
       ],
-      "latency_s": 60.32,
+      "latency_s": 28.42,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -182,15 +178,16 @@
       "coverage_missed": [],
       "evidence_pass": true,
       "grounding": {
-        "grounding_score": 0.85,
-        "supported_claim_count": 6,
-        "unsupported_claim_count": 1,
-        "irrelevant_evidence_count": 0,
+        "grounding_score": 0.5,
+        "supported_claim_count": 4,
+        "unsupported_claim_count": 3,
+        "irrelevant_evidence_count": 1,
         "ungrounded_claim_examples": [
-          "financial products category/domain",
-          "coaching recommendation specificity"
+          "AgentNWGB's empathy score of 0.642",
+          "AgentBYTO's empathy score of 0.763",
+          "AgentNWGB resolved C0001407 but failed C0011964"
         ],
-        "one_line_judgment": "Most substantive claims are well-grounded; the \"financial products\" category reference lacks support from the provided evidence."
+        "one_line_judgment": "Aggregate metrics grounded by tool calls, but specific empathy scores and case details lack direct support or contain inconsistencies with evidence."
       },
       "status": "pass",
       "error": null
@@ -200,12 +197,12 @@
       "category": "trajectory",
       "language": "mixed",
       "question": "Walk me through how customer sentiment changed across conversation C0009233.",
-      "answer": "Conversation C0009233 is a **Promotions & Vouchers** case that ended unresolved and was escalated. The sentiment arc tells a clear downward-then-briefly-up story:\n\n**Turn 0 – Neutral opener:** The customer starts calmly, asking for help with a voucher (\"Mujhe Voucher ke baare mein help chahiye.\" → sentiment 0.0).\n\n**Turns 2–6 – Rapid drop to negative (−0.6):** The customer immediately signals time pressure — they have a flight in two hours — and repeats the same urgency plea three times (\"Thoda jaldi please, flight in 2 hours.\"). The agent's responses are largely neutral status updates (\"Please allow me a moment while I run some checks\"), which fail to reassure or resolve anything, keeping sentiment locked at −0.6.\n\n**Turns 10–12 – Sentiment deepens to −0.7 and escalation request:** Frustration peaks when the issue still isn't fixed. The customer explicitly asks to escalate (\"Still not fixed. Can you escalate?\"), scoring −0.7. The agent's acknowledgement here (\"Thanks for reaching out! I'm pulling up the details.\") feels out of place — it reads like a scripted opener dropped mid-conversation, which likely amplifies the customer's frustration.\n\n**Turn 14 – Brief positive spike (+0.6):** There is a single bright spot where the customer confirms something worked (\"Got it. I've retried, and it works now.\"), lifting sentiment to +0.6. However, this recovery is short-lived.\n\n**Turn 16 – Back to −0.6:** The very next customer turn is again the same urgency complaint, suggesting the earlier \"fix\" didn't hold or the customer had a separate outstanding concern.\n\n**Overall:** The conversation closes with an overall sentiment of −0.42, an escalation flag, and no resolution. The core issue was the agent's inability to keep pace with a time-pressured customer — repetitive \"please wait\" responses without any substantive progress drove a spiral of urgency → frustration → escalation.",
+      "answer": "Conversation C0009233 is a **Promotions & Vouchers** query conducted largely in Hindi/Hinglish that ended unresolved and was escalated. Here is how sentiment evolved across its 9 customer turns:\n\n**1. Neutral opening (Turn 0 → score 0.0)**\nThe customer started calmly, asking for help with a voucher: *\"Mujhe Voucher ke baare mein help chahiye.\"* No frustration yet.\n\n**2. Sharp drop to negative — urgency kicks in (Turns 2–6 → scores –0.6)**\nFrom the very next customer turn, sentiment collapsed to –0.6 and stayed flat there. The customer was under time pressure due to an upcoming flight and repeatedly pressed the agent: *\"Thoda jaldi please, flight in 2 hours.\"* The agent responded with generic holding messages (\"Please allow me a moment\", \"Main abhi verify kar rahi/raha hoon, kindly wait\"), which did nothing to arrest the decline.\n\n**3. Deepening frustration — escalation demand (Turns 10 & 12 → scores –0.7)**\nWith the issue still unresolved, sentiment dipped further to –0.7 as the customer explicitly demanded escalation: *\"Still not fixed. Can you escalate?\"* The agent again responded with a scripted acknowledgement rather than action.\n\n**4. Brief positive spike (Turn 14 → score +0.6)**\nUnexpectedly, the customer reported a self-resolved outcome: *\"Got it. I've retried, and it works now.\"* This lifted sentiment sharply.\n\n**5. Relapse to negative (Turn 16 → score –0.6)**\nThe positive moment was short-lived. The customer immediately reverted to urgency: *\"Thoda jaldi please, flight in 2 hours.\"* — suggesting the issue was not truly resolved or the agent's follow-up felt inadequate.\n\n**Overall picture:** The arc (0.0 → –0.6 → –0.7 → +0.6 → –0.6) is a classic **false-recovery pattern** — a brief lift followed by a relapse — ending with an overall sentiment of –0.42. The conversation was flagged for escalation and left unresolved, driven primarily by the agent's repetitive, non-actionable responses in the face of a time-sensitive customer need.",
       "evidence_count": 3,
       "tools_used": [
         "get_trajectory"
       ],
-      "latency_s": 26.32,
+      "latency_s": 21.3,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -215,16 +212,14 @@
       "coverage_missed": [],
       "evidence_pass": true,
       "grounding": {
-        "grounding_score": 0.65,
-        "supported_claim_count": 6,
-        "unsupported_claim_count": 5,
+        "grounding_score": 0.85,
+        "supported_claim_count": 9,
+        "unsupported_claim_count": 1,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [
-          "Turn 0 starts at sentiment 0.0",
-          "agent's 'Please allow me a moment while I run some checks' responses",
-          "Turn 14 sentiment spike to +0.6"
+          "Got it. I've retried, and it works now."
         ],
-        "one_line_judgment": "Core sentiment transitions are grounded by trajectory tool and evidence quotes, but specific turn-by-turn sentiment values, agent phrasings, and interpretive claims lack supporting quotes."
+        "one_line_judgment": "Almost all substantive claims are grounded by the trajectory tool call and supporting quotes, but the self-resolved outcome quote is missing."
       },
       "status": "pass",
       "error": null
@@ -234,13 +229,12 @@
       "category": "trajectory",
       "language": "en",
       "question": "Take conversation C0000053 and describe the inflection points where\nsentiment changed direction.",
-      "answer": "**C0000053 — Sentiment Arc: [-0.7 → -0.6 → -0.6 → -0.6 → 0.0]**\n\nThe customer's sentiment trajectory across 10 turns shows two clear inflection points:\n\n**Inflection 1 — Slight recovery (Turn 0 → Turn 2): -0.7 to -0.6**\nThe conversation opens at its most negative (-0.7) with a billing complaint (\"I was charged twice for my FASTag.\"). The agent's immediate apology and offer to investigate (Turn 1) produces a small upward nudge, bringing the customer's score from -0.7 to -0.6. However, this recovery is modest and quickly overshadowed by the customer's escalating urgency — they are about to board a flight and repeat the plea *\"Thoda jaldi please, flight in 2 hours\"* three times across Turns 2, 4, and 6. The sentiment plateau at -0.6 through these turns signals that the agent's mid-conversation acknowledgements (Turns 3 and 5) were not enough to meaningfully reduce frustration.\n\n**Inflection 2 — Neutral acceptance (Turn 6 → Turn 8): -0.6 to 0.0**\nThe second and most significant shift happens when the agent moves from stalling (\"Please allow me a moment…\") to asking a concrete, actionable question: *\"May I have the registered email or phone?\"* (Turn 7). This shifts the customer from repeated urgency into a resigned-but-calm *\"Okay, waiting for an update.\"* (Turn 8, sentiment 0.0). Frustration is no longer actively expressed; the customer has entered a passive waiting mode.\n\n**Overall trajectory & resolution**\nDespite the partial recovery, the conversation ends unresolved (resolution_flag = 0) with an overall sentiment of -0.5. The final agent message — escalating to a specialist team — is empathetic in tone but does not fully land as a resolution, leaving the customer at neutral rather than positive. The case illustrates a common pattern: urgency that goes unaddressed through three successive turns erodes trust enough that even a well-intentioned closing message cannot push sentiment into positive territory.",
+      "answer": "Conversation C0000053 is a payments/wallet complaint about a double FASTag charge. The customer arc is: **−0.7 → −0.6 → −0.6 → −0.6 → 0.0**, showing two clear inflection points.\n\n**Inflection Point 1 — Slight lift: Turn 0 → Turn 2 (−0.7 to −0.6)**\nThe customer opens with a sharp negative complaint (\"I was charged twice for my FASTag.\"). The agent responds with an empathetic apology (Turn 1), which nudges sentiment very slightly upward from −0.7 to −0.6. This is a small but real improvement — the customer's frustration eases marginally upon hearing \"I'm sorry about the trouble.\"\n\n**Inflection Point 2 — Plateau and stall: Turns 2–6 (stuck at −0.6)**\nDespite the early lift, sentiment flatlines at −0.6 across three consecutive customer turns. The customer is under time pressure (\"Thoda jaldi please, flight in 2 hours.\") and repeats this urgency three times. The agent's responses in this stretch (pulling up details, running checks, asking for email/phone) are procedurally appropriate but fail to break the negative plateau — the urgency is acknowledged but not resolved quickly enough.\n\n**Inflection Point 3 — Recovery to neutral: Turn 6 → Turn 8 (−0.6 to 0.0)**\nThe biggest shift happens at the end. Once the agent finally requests account-identifying information (Turn 7) and the customer accepts the wait (\"Okay, waiting for an update.\" — Turn 8), sentiment jumps from −0.6 to 0.0. The agent then closes by escalating to a specialist team (Turn 9), which appears to give the customer enough closure to reach neutral — even though the issue was not resolved (resolution_flag = 0).",
       "evidence_count": 3,
       "tools_used": [
-        "get_trajectory",
-        "get_conversation"
+        "get_trajectory"
       ],
-      "latency_s": 25.81,
+      "latency_s": 16.69,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -250,11 +244,11 @@
       "evidence_pass": true,
       "grounding": {
         "grounding_score": 1.0,
-        "supported_claim_count": 7,
+        "supported_claim_count": 8,
         "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [],
-        "one_line_judgment": "All substantive claims are grounded: sentiment trajectory and inflection points by get_trajectory tool call; all verbatim quotes and specific conversation claims supported by evidence."
+        "one_line_judgment": "All substantive claims are grounded: sentiment trajectory is grounded by get_trajectory tool call; three inflection points, their timing, and specific turn references are correctly identified; all three verbatim quotes are provided and properly paired to the claims they support."
       },
       "status": "pass",
       "error": null
@@ -264,7 +258,7 @@
       "category": "recurring_concerns",
       "language": "en",
       "question": "Which recurring customer concerns should leadership review first?\nRank by a sensible severity metric and show one concrete example per topic.",
-      "answer": "**Severity metric:** `escalation_rate × (1 − resolution_rate) × volume` — this rewards urgency for topics that are simultaneously high-volume, frequently escalated, and rarely resolved.\n\n---\n\n**Top 7 topics leadership should review, ranked by severity:**\n\n| Rank | Topic | Volume | Esc. Rate | Res. Rate | Severity Score |\n|------|-------|--------|-----------|-----------|----------------|\n| 1 | 🔴 Account & Authentication | 364 | 69.5% | 32.7% | **169.8** |\n| 2 | 🔴 Learning & Education | 272 | 71.7% | 28.3% | **139.7** |\n| 3 | 🔴 Developer & Platform | 291 | 67.7% | 30.6% | **136.9** |\n| 4 | 🔴 Financial Products | 231 | 70.1% | 28.6% | **115.4** |\n| 5 | 🟠 Billing & Refunds | 220 | 74.5% | 35.5% | **105.7** |\n| 6 | 🟠 Payments & Wallet | 177 | 77.4% | 31.1% | **94.4** |\n| 7 | 🟡 Telecom Number Mgmt | 90 | 72.2% | 31.1% | **44.7** |\n\n**Key takeaways:**\n- **Account & Authentication** is the single biggest fire — 364 conversations, barely 1-in-3 resolved, and nearly 70% escalated. Login lockouts and credential failures are clearly a product/ops gap.\n- **Learning & Education** and **Developer & Platform** both exceed 270 conversations with resolution rates below 31%. These suggest self-serve or product functionality gaps that agents simply can't fix on the spot.\n- **Financial Products** and **Billing & Refunds** together signal a dual financial-trust risk — double-charges and billing errors with low resolution are the kind of issues that drive churn and regulatory scrutiny.\n- **Payments & Wallet** has the highest escalation rate of all topics (77.4%), meaning virtually 4 in 5 wallet issues cannot be resolved at first touch — a strong signal for a dedicated escalation pathway or tooling improvement.",
+      "answer": "Below is a severity-ranked view of the top recurring customer concerns. **Severity** was computed as a composite of three factors: **escalation rate** (primary driver — the proportion of conversations that had to be escalated), **negative sentiment** (average customer mood, lower = worse), and **volume** (total conversations). All topics are in negative-sentiment territory, so escalation rate and resolution rate are the key differentiators.\n\n---\n\n**🔴 Tier 1 — Critical: Escalate Immediately**\n\n| # | Topic | Volume | Esc. Rate | Avg Sentiment | Res. Rate | Severity |\n|---|-------|--------|-----------|---------------|-----------|---------|\n| 1 | **Payments & Wallet** | 177 | **77.4%** | -0.115 | 31.1% | Highest escalation in dataset |\n| 2 | **Billing & Refunds** | 220 | **74.5%** | -0.127 | 35.5% | High volume + worst escalation combo |\n| 3 | **Learning & Education** | 272 | **71.7%** | -0.118 | 28.3% | Highest volume in Tier 1; lowest resolution rate |\n\n**🟠 Tier 2 — High Priority**\n\n| # | Topic | Volume | Esc. Rate | Avg Sentiment | Res. Rate |\n|---|-------|--------|-----------|---------------|-----------|\n| 4 | **Telecom Number Mgmt** | 90 | 72.2% | **-0.155** | 31.1% |\n| 5 | **Broadband & Connectivity** | 52 | 71.2% | **-0.157** | 26.9% |\n| 6 | **Account & Auth** | 364 | 69.5% | -0.135 | **32.7%** |\n\n**Key themes across all topics:**\n- Agents frequently re-ask for account credentials rather than resolving the issue, causing customers to demand escalation.\n- Resolution rates are shockingly low across the board (26–37%), suggesting systemic process or tooling gaps rather than isolated agent skill issues.\n- Broadband and Telecom Number Management stand out with the worst customer sentiment scores in the dataset (-0.157 and -0.155), signalling the most emotionally distressing experiences despite smaller volumes.",
       "evidence_count": 3,
       "tools_used": [
         "query_conversations",
@@ -273,31 +267,27 @@
         "semantic_search",
         "semantic_search",
         "semantic_search",
-        "semantic_search",
-        "semantic_search",
         "semantic_search"
       ],
-      "latency_s": 55.29,
+      "latency_s": 42.7,
       "tool_selection_pass": true,
-      "coverage": 0.5,
+      "coverage": 1.0,
       "coverage_matched": [
+        "concern",
         "topic"
       ],
-      "coverage_missed": [
-        "concern"
-      ],
+      "coverage_missed": [],
       "evidence_pass": true,
       "grounding": {
-        "grounding_score": 0.75,
-        "supported_claim_count": 9,
-        "unsupported_claim_count": 3,
+        "grounding_score": 0.8,
+        "supported_claim_count": 11,
+        "unsupported_claim_count": 2,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [
-          "login lockouts and credential failures are clearly a product/ops gap",
-          "Financial Products and Billing & Refunds together signal a dual financial-trust risk",
-          "agents simply can't fix on the spot"
+          "Agents frequently re-ask for account credentials rather than resolving the issue",
+          "systemic process or tooling gaps rather than isolated agent skill issues"
         ],
-        "one_line_judgment": "Aggregate statistics (volume, rates, severity scores) are grounded by SQL tool call; concrete examples are supported by quotes; but interpretive claims about root causes and strategic implications lack direct evidence."
+        "one_line_judgment": "Most numeric claims are grounded by the SQL tool call (query_conversations), but two interpretive claims about \"systemic process or tooling gaps\" and credential re-asking patterns lack direct conversational evidence."
       },
       "status": "pass",
       "error": null
@@ -307,16 +297,12 @@
       "category": "recurring_concerns",
       "language": "en",
       "question": "Which topics combine high volume with low resolution rate? Those are the\nones we should fix first.",
-      "answer": "**The three topics with the worst combination of high volume and low resolution rate are:**\n\n| Topic | Volume | Resolution Rate | Escalation Rate | Avg Sentiment |\n|---|---|---|---|---|\n| **Account & Auth** | 364 (highest) | 32.7% | 69.5% | -0.135 |\n| **Developer & Platform** | 291 (3rd) | 30.6% | 67.7% | -0.123 |\n| **Learning & Education** | 272 (4th) | 28.3% | 71.7% | -0.118 |\n\n**Account & Authentication** is the single biggest fire to fight: it generates more contacts than any other topic (364) yet resolves fewer than 1-in-3. Common patterns include account lock-outs where agents loop on identity verification without completing the unlock, leaving customers stuck.\n\n**Developer & Platform** and **Learning & Education** are close behind. Developer issues show a recurring \"UPI payment succeeded but service not provisioned\" pattern that agents struggle to resolve in-session, leading to escalations ~68% of the time. Learning/Education shows a similar story — course access failures often end with the customer still waiting. Two other noteworthy mentions: **Financial Products** (231 contacts, 28.6% resolution, 70.1% escalation) and **Promotions & Vouchers** (225 contacts, 29.8% resolution) also sit in dangerous territory and are worth including in any fix sprint.",
-      "evidence_count": 3,
+      "answer": "Here's a breakdown of all 15 topics sorted by volume, with their resolution rates. The most urgent \"fix-first\" candidates — those combining **high conversation volume with low resolution rates** — are:\n\n| Topic | Volume | Resolution Rate |\n|---|---|---|\n| **Account & Authentication** | 364 | 32.7% |\n| **Orders & Delivery** | 296 | 36.8% |\n| **Developer & Platform** | 291 | 30.6% ⚠️ |\n| **Learning & Education** | 272 | 28.3% ⚠️ |\n| **Healthcare Services** | 234 | 35.0% |\n| **Financial Products** | 231 | 28.6% ⚠️ |\n| **Promotions & Vouchers** | 225 | 29.8% ⚠️ |\n| **Billing & Refunds** | 220 | 35.5% |\n| **Travel & Transport** | 204 | 30.4% ⚠️ |\n| **Telecom Plans** | 190 | 28.9% ⚠️ |\n\n**Top 3 priorities to fix:**\n\n1. **Learning & Education** (272 conversations, 28.3% resolution) — Second-highest volume in the low-resolution band. Nearly 3 in 4 contacts leave unresolved.\n2. **Financial Products** (231 conversations, 28.6% resolution) — High stakes (financial issues) + poor resolution is a churn/trust risk.\n3. **Developer & Platform** (291 conversations, 30.6% resolution) — Third-highest volume overall; a 30% resolution rate on technical contacts suggests agents may lack the tooling or knowledge to close these issues.\n\n**Promotions & Vouchers** (225 convs, 29.8%) and **Telecom Plans** (190 convs, 28.9%) are close runners-up. Notably, **Account & Authentication** has the single highest volume (364 convs) at 32.7% — not the worst resolution rate, but the sheer scale means even a small improvement would yield the most resolved cases in absolute terms. **Insurance & Claims** is the bright spot at 47.3% resolution despite low volume.",
+      "evidence_count": 0,
       "tools_used": [
-        "query_conversations",
-        "query_conversations",
-        "semantic_search",
-        "semantic_search",
-        "semantic_search"
+        "query_conversations"
       ],
-      "latency_s": 36.04,
+      "latency_s": 17.31,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -326,16 +312,12 @@
       "coverage_missed": [],
       "evidence_pass": true,
       "grounding": {
-        "grounding_score": 0.75,
-        "supported_claim_count": 8,
-        "unsupported_claim_count": 2,
+        "grounding_score": 1.0,
+        "supported_claim_count": 20,
+        "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
-        "ungrounded_claim_examples": [
-          "Financial Products (231 contacts, 28.6% resolution, 70.1% escalation)",
-          "Promotions & Vouchers (225 contacts, 29.8% resolution)",
-          "agents loop on identity verification without completing the unlock"
-        ],
-        "one_line_judgment": "Most substantive claims are grounded: aggregate metrics from SQL tools (counts, rates, rankings), plus conversation-specific patterns supported by evidence quotes; however, Financial Products and Promotions & Vouchers claims lack corresponding SQL data in tool results."
+        "ungrounded_claim_examples": [],
+        "one_line_judgment": "All substantive claims are aggregate statistics grounded by query_conversations tool call; no evidence quotes needed."
       },
       "status": "pass",
       "error": null
@@ -345,16 +327,17 @@
       "category": "semantic",
       "language": "hi",
       "question": "Find conversations where Hindi-speaking customers complain about app\ncrashes. Show me one full example.",
-      "answer": "Several conversations were found where Hindi/Hinglish-speaking customers complained about app crashes. The complaint phrase \"App crash ho rahi hai\" (the app is crashing) appears across multiple topics — Payments & Wallet, Developer Platform, Financial Products, and Telecom — indicating this is a cross-functional pain point. The conversations are predominantly in Hinglish (mixed Hindi + English), which is typical for this customer base.\n\n**Full example — C0013754 (Payments & Wallet, Oct 2025, Escalated & Resolved):**\nThe customer opened with a Hinglish complaint about the Wallet feature crashing. They then expressed urgency with \"Thoda jaldi please, flight in 2 hours,\" signalling high stress. The agent responded with empathy but the resolution was slow (spanning 4 days), prompting the customer to explicitly request escalation (\"Still not fixed. Can you escalate?\"). After escalation to a specialist team, the customer confirmed the app was working: \"Got it. I've retried, and it works now.\" The case was ultimately resolved.\n\nThe broader pattern shows that app crash complaints from Hindi/Hinglish speakers span multiple product areas (Wallet, eSIM, Savings, Webhooks, Reports), often carry negative opening sentiment (scores around -0.8), and have a meaningful escalation rate — suggesting the issue is systemic rather than isolated.",
+      "answer": "Several conversations were found where Hindi/Hinglish-speaking customers complain about app crashes. The characteristic phrase used is **\"App crash ho rahi hai\"** (the app is crashing), often while using specific features such as Lab Test, SSO, Billing, Broadband, or Audit Logs. These conversations span topics like healthcare_services, account_auth, developer_platform, and billing_refunds, and the majority are escalated — indicating the crashes are a persistent, unresolved pain point.\n\n**Full example — C0012153 (Healthcare Services, escalated, unresolved):**\nThe customer reported the app crashing during a Lab Test session. Despite the agent acknowledging the issue twice with apologies, no technical fix was provided. The customer escalated urgency (\"It's urgent. Please expedite.\" and \"Still not fixed. Can you escalate?\"), and the conversation ended without resolution — it was escalated and flagged as unresolved. The overall sentiment was negative (-0.13), dragged down by strong opening negativity (-0.7) and a final escalation (-0.7).\n\nThis pattern repeats across at least 8 similar conversations in the dataset, all using the Hinglish phrase \"App crash ho rahi hai\". The high escalation rate in this cluster suggests a systemic app stability issue that support agents are not empowered to resolve on the spot.",
       "evidence_count": 3,
       "tools_used": [
         "semantic_search",
         "semantic_search",
         "semantic_search",
         "semantic_search",
+        "semantic_search",
         "get_conversation"
       ],
-      "latency_s": 41.37,
+      "latency_s": 40.75,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -365,11 +348,11 @@
       "evidence_pass": true,
       "grounding": {
         "grounding_score": 1.0,
-        "supported_claim_count": 7,
+        "supported_claim_count": 10,
         "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [],
-        "one_line_judgment": "All substantive claims are supported by semantic_search tool calls (identifying multiple Hindi/Hinglish app crash complaints across topics) and direct conversation text quotes (conversation C0013754 full transcript with customer urgency, escalation request, and resolution)."
+        "one_line_judgment": "All substantive claims are directly grounded: conversation-specific details from the full C0012153 example are supported by quotes; the aggregate pattern claim about \"at least 8 similar conversations\" is grounded by the semantic_search tool call that returned 8 rows; the Hinglish phrase and topic/escalation/sentiment characteristics are all quoted."
       },
       "status": "pass",
       "error": null
@@ -379,16 +362,16 @@
       "category": "semantic",
       "language": "hi",
       "question": "Mujhe billing aur refund ki problems ke baare mein conversations dikhao.",
-      "answer": "**Billing & Refund conversations ka overview:**\n\nDataset mein kaafi saari billing aur refund ki problems hain. Inme se zyaadatar conversations mein customer ka sentiment negative hai, escalation bhi hua, aur resolution nahi mila. Neeche 3 representative examples hain:\n\n---\n\n🔴 **Conv C0009478** – AgentKAOK | Escalated ✅ | Resolved ❌ | Sentiment: -0.43 (Negative)\nCustomer ne Hindi mein billing help maangi, lekin problem baar-baar fix nahi hui. Customer ne multiple baar urgency express ki — *\"Thoda jaldi please, flight in 2 hours\"* — aur teen baar escalation request ki. Agent ne empathy dikhaya par resolution nahi mila.\n\n---\n\n🔴 **Conv C0001196** – AgentRYFQ | Escalated ✅ | Resolved ❌ | Sentiment: -0.125\nCustomer ka UPI payment successful tha lekin service nahi mili (*\"UPI shows successful but I didn't get the service for Refund\"*). Agent ne specialist team ko escalate kiya. Kuch turns mein customer ne satisfaction bhi express ki, par overall resolution nahi hua.\n\n---\n\n🟡 **Conv C0006597** – AgentSPWN | Escalated ✅ | Resolved ✅ | Sentiment: -0.08 (Near Neutral)\nCustomer ne Hindi mein refund help maangi (*\"Mujhe Refund ke baare mein help chahiye\"*). Baar-baar urgency aur escalation requests ke baad conversation resolve hua — ek rare example jahan billing issue ka solution mila.\n\n---\n\n**Key Patterns:**\n- Billing/Refund conversations mein **high escalation rate** hai\n- Zyaadatar cases mein **resolution nahi hota**\n- Customers aksar **Hindi/Hinglish mein urgency** express karte hain\n- UPI payment failures aur refund delays sabse common complaints hain",
-      "evidence_count": 3,
+      "answer": "Billing & Refunds topic mein dataset mein kul **220 conversations** hain. Yeh ek highly problematic category hai — **74.5% escalation rate** aur sirf **35.5% resolution rate** ke saath. Average customer sentiment **-0.13 (negative)** hai, jo darshata hai ki zyaadatar customers frustrated hote hain.\n\nSabse common issues hain: UPI payment successful dikhana lekin service na milna, refund processing mein delay, aur billing queries ka timely resolve na hona. Agents empathetic hote hain lekin backend/system delays ki wajah se problems resolve nahi ho paatein.\n\nYeh topic overall contact centre ke liye ek **urgent focus area** hai — escalations aur unresolved cases dono bahut zyada hain.",
+      "evidence_count": 2,
       "tools_used": [
         "query_conversations",
         "semantic_search",
         "get_conversation",
         "get_conversation",
-        "get_conversation"
+        "query_conversations"
       ],
-      "latency_s": 43.01,
+      "latency_s": 36.46,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -398,14 +381,16 @@
       "coverage_missed": [],
       "evidence_pass": true,
       "grounding": {
-        "grounding_score": 0.9,
-        "supported_claim_count": 13,
-        "unsupported_claim_count": 1,
+        "grounding_score": 0.8,
+        "supported_claim_count": 4,
+        "unsupported_claim_count": 2,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [
-          "high escalation rate"
+          "refund processing mein delay",
+          "billing queries ka timely resolve na hona",
+          "Agents empathetic hote hain lekin backend/system delays"
         ],
-        "one_line_judgment": "Nearly all substantive claims are grounded by evidence quotes; only the \"high escalation rate\" claim lacks specific quantification from query results."
+        "one_line_judgment": "Most quantitative claims are grounded by SQL tool calls; specific issue descriptions lack direct evidence support."
       },
       "status": "pass",
       "error": null
@@ -415,17 +400,15 @@
       "category": "semantic",
       "language": "hi",
       "question": "Show me Hindi conversations where customers express urgency or time pressure.",
-      "answer": "Two Hindi conversations were found where customers explicitly expressed urgency and time pressure. Both feature the phrase **\"Thoda jaldi please, flight in 2 hours\"** — a clear, time-bound request for faster resolution before a flight departure. Interestingly, this phrase appears as a recurring, repeated signal across multiple turns in both conversations, indicating that the customer felt their urgency was not being acknowledged fast enough.\n\n**C0009233** (Promotions & Vouchers, Nov 2025, AgentCLKH): The customer needed help with a voucher and repeatedly urged the agent to hurry due to an imminent flight. The urgency went unresolved — the conversation escalated, was not resolved, and the customer eventually demanded escalation (\"Still not fixed. Can you escalate?\"). Sentiment was notably negative (−0.42).\n\n**C0008827** (Billing & Refunds, Oct 2025, AgentOVSR): The customer reported a double charge and repeatedly pressed for speed due to the same flight-related time crunch. The agent responded with standard status updates (\"Main abhi verify kar rahi/raha hoon, kindly wait\") rather than urgency-matching. Despite the customer's positive wrap-up mid-conversation, the urgency phrase recurs at the final turn, suggesting lingering frustration. Sentiment was −0.43.\n\nA key coaching takeaway: in both cases agents responded with generic \"please wait\" replies rather than acknowledging the customer's time constraint empathetically or triaging the issue faster. The urgency signal (\"flight in 2 hours\") was tagged as `urgency_request` intent across all relevant turns but met with only `neutral` empathy signals from agents.",
+      "answer": "Two Hindi conversations were identified where customers clearly express urgency and time pressure — in both cases with the exact phrase **\"Thoda jaldi please, flight in 2 hours\"** (please hurry, I have a flight in 2 hours), repeated multiple times across the conversation.\n\n**Conversation C0009233** (Topic: Promotions & Vouchers | Nov 2025 | Escalated ✅)\nCustomer CustLMLOL opened with a voucher query and then repeatedly pressed the agent for speed due to an imminent flight. The urgency was ignored — agents responded with generic \"I am verifying now, kindly wait\" replies. The customer's frustration peaked with two explicit escalation requests (\"Still not fixed. Can you escalate?\"), and the conversation did eventually escalate. Sentiment was consistently negative (-0.6 for each urgency turn), and the issue was not resolved.\n\n**Conversation C0008827** (Topic: Billing & Refunds | Oct 2025 | Not Escalated)\nCustomer CustSABNZ was dealing with a double-charge on a refund and expressed the same flight-related time urgency four times. Agents again responded with generic wait messages, though the conversation eventually ended with the agent manually adjusting the invoice. Despite reaching an apparent resolution, the customer's final recorded turn was still an urgency plea, and overall sentiment remained negative (-0.43).\n\n**Key pattern:** Both conversations share the identical urgency signal (\"Thoda jaldi please, flight in 2 hours\"), indicating a real travel-related time crunch. Agents in both cases responded with standard \"please wait / verifying\" scripts, failing to acknowledge the time sensitivity — contributing to negative customer sentiment and, in one case, an escalation. These conversations highlight a gap in agent training around handling **time-critical, travel-context requests** in Hindi.",
       "evidence_count": 2,
       "tools_used": [
-        "semantic_search",
-        "semantic_search",
         "semantic_search",
         "semantic_search",
         "get_conversation",
         "get_conversation"
       ],
-      "latency_s": 47.92,
+      "latency_s": 28.18,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -435,14 +418,15 @@
       "evidence_pass": true,
       "grounding": {
         "grounding_score": 0.85,
-        "supported_claim_count": 11,
+        "supported_claim_count": 9,
         "unsupported_claim_count": 2,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [
-          "agents responded with generic 'please wait' replies rather than acknowledging the customer's time constraint empathetically",
-          "the urgency signal was tagged as `urgency_request` intent"
+          "Sentiment was consistently negative (-0.6 for each urgency turn)",
+          "Topic: Promotions & Vouchers",
+          "overall sentiment remained negative (-0.43)"
         ],
-        "one_line_judgment": "Most substantive claims are grounded by direct evidence quotes; two interpretive claims about agent behavior lack explicit quote support but are reasonably inferred from evidence context."
+        "one_line_judgment": "Most substantive claims are grounded by the provided quotes, but specific details about sentiment values, topic labels, and escalation status lack direct quote support."
       },
       "status": "pass",
       "error": null
@@ -452,7 +436,7 @@
       "category": "semantic",
       "language": "hi",
       "question": "Aise customers ke conversations dhundo jo unresolved escalations ke baad\nbahut frustrated hain.",
-      "answer": "Yahan **top 5 conversations** hain jahan customers unresolved escalations ke baad sabse zyada frustrated dikh rahe hain (sentiment score -0.65 ya usse neeche, resolution_flag = false, escalation_flag = true):\n\n| Conv ID | Topic | Agent | Sentiment | Turns |\n|---|---|---|---|---|\n| **C0003298** | Telecom Plans | AgentQRGU | -0.67 | 12 |\n| **C0004943** | Orders & Delivery | AgentTLYU | -0.66 | 10 |\n| **C0007482** | Developer Platform | AgentRGPW | -0.66 | 12 |\n| **C0004935** | Payments/FASTag | AgentBXZE | -0.65 | 12 |\n| **C0001949** | Financial Products | AgentQRHA | -0.65 | 16 |\n\n**Pattern jo dikh raha hai:** In sabhi conversations mein customer baar baar \"Still not fixed. Can you escalate?\" bol raha hai — lekin agent sirf generic responses de raha hai jaise \"I understand this is frustrating. I'm investigating now.\" Koi concrete resolution nahi milti aur issue unresolved hi rehta hai.\n\n**C0004935 (FASTag/Payments)** ek critical example hai — customer ne \"App crash ho rahi hai while using FASTag\" se shuru kiya, 4 baar escalation maanga (turn 2, 6, 8, 10) aur urgency bhi express ki (\"It's urgent. Please expedite.\"), phir bhi conversation unresolved close hui. Isi tarah **C0002874 (Mutual Fund double charge)** mein customer ne 4+ baar escalate karne ki request ki, agent baar baar same response repeat karta raha aur issue resolve nahi hua.",
+      "answer": "Yahan top 3 sabse frustrated customers ke conversations hain jinki escalation hui lekin problem unresolved rahi (sentiment score ≤ -0.60):\n\n---\n\n**1. C0003298 — CustQCBLI (Telecom Plans | Sentiment: -0.67)**\nCustomer ka 4G Pack coupon checkout par apply nahi ho raha tha aur uski flight bhi 2 ghante mein thi. Usne baar baar \"Still not fixed. Can you escalate?\" kaha — 3 baar escalation request! Agent ne sirf generic responses diye, aur conversation unresolved hi rahi.\n\n**2. C0004943 — CustOKQNJ (Orders & Delivery | Sentiment: -0.66)**\nCustomer ne UPI se payment kiya tha, lekin Exchange service nahi mili. Tune \"Thoda jaldi please, flight in 2 hours\" bolke urgency bhi batai — fir bhi agent ne 2 baar escalation ignore kiya. Problem officially unresolved hai.\n\n**3. C0002874 — CustJBHQD (Financial Products | Sentiment: -0.60)**\nMutual Fund ke liye double charge hua. Customer ne 4 baar escalation maangi, har baar agent ne wahi ghisa-pita jawab diya — \"I understand this is frustrating. I'm investigating now.\" Lekin koi action nahi hua, conversation closed bina resolution ke.\n\n---\n\n**Pattern:** Teeno mein ek hi theme hai — agents ne empathy toh dikhaya, lekin concrete action zero tha. Escalation loop mein customers phanse rahe, issue solve nahi hua, aur frustration peak par pahunchi. Yeh cases urgent callback ya supervisor review ke liye flag kiye jaane chahiye.",
       "evidence_count": 3,
       "tools_used": [
         "semantic_search",
@@ -461,7 +445,7 @@
         "get_conversation",
         "get_conversation"
       ],
-      "latency_s": 37.48,
+      "latency_s": 34.82,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -471,14 +455,16 @@
       "coverage_missed": [],
       "evidence_pass": true,
       "grounding": {
-        "grounding_score": 0.85,
-        "supported_claim_count": 10,
-        "unsupported_claim_count": 1,
+        "grounding_score": 0.75,
+        "supported_claim_count": 9,
+        "unsupported_claim_count": 3,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [
-          "C0002874 (Mutual Fund double charge) mein customer ne 4+ baar escalate karne ki request ki"
+          "4G Pack coupon checkout par apply nahi ho raha tha",
+          "agent ne 2 baar escalation ignore kiya",
+          "teeno conversations ke patterns mein concrete action zero tha"
         ],
-        "one_line_judgment": "Most substantive claims are grounded via tool calls (table statistics) and conversation quotes; one specific claim about C0002874 lacks complete evidence."
+        "one_line_judgment": "Most substantive claims about the three conversations are supported by quotes and tool calls, but some specific details (coupon issue in C0003298, agent ignoring escalations in C0004943) lack direct evidence quotes."
       },
       "status": "pass",
       "error": null
@@ -488,15 +474,16 @@
       "category": "edge_case",
       "language": "en",
       "question": "Tell me everything you know about AgentTVAX and pull one of their\nconversations as evidence.",
-      "answer": "**AgentTVAX — Full Profile**\n\nAgentTVAX has handled **1 conversation** in the dataset (C0014476, dated 2025-10-16 to 2025-10-20). Here is everything known about them:\n\n| Metric | Value |\n|---|---|\n| Conversations handled | 1 |\n| Topic | Developer & Platform |\n| Agent Empathy Mean | **0.83** (notably high vs. the dataset-wide median of 0.5) |\n| Customer Sentiment Overall | **–0.52** (clearly negative) |\n| Resolution | ❌ Not resolved |\n| Escalation | ⚠️ Escalated |\n\n**Strengths:** AgentTVAX's empathy score of 0.83 is well above the typical 0.5 seen across most agents, suggesting consistently empathetic language (\"I understand this is frustrating,\" \"I'm sorry about the trouble\"). They acknowledged the customer's urgency and kept a professional, caring tone throughout.\n\n**Concerns:** Despite the empathy, the conversation ended unresolved and was escalated. The customer grew increasingly frustrated over a multi-day API issue, repeatedly expressing urgency (\"It's urgent. Please expedite.\" / \"Thoda jaldi please, flight in 2 hours.\"). The conversation also shows some timeline inconsistencies in the turns, which may indicate the issue dragged on without a concrete fix — the final agent turn offered a refund, which is an unusual resolution for a Developer Platform complaint and may not have addressed the root API problem.",
-      "evidence_count": 2,
+      "answer": "**AgentTVAX — Complete Profile**\n\nAgentTVAX has handled exactly **1 conversation** in the dataset (conv C0014476, dated 2025-10-16 to 2025-10-20). Their sole case was a **Developer & Platform** issue reported by customer CustTAYZE about a broken API. Key metrics for that conversation:\n\n| Metric | Value |\n|---|---|\n| Topic | Developer & Platform |\n| Customer Sentiment (overall) | **–0.52** (clearly negative) |\n| Agent Empathy Mean | **0.83** (high — 5 of 6 agent turns were empathetic) |\n| Resolved | ❌ No |\n| Escalated | ✅ Yes |\n\n**Strengths:** AgentTVAX showed consistently warm language — phrases like *\"I understand this is frustrating. I'm investigating now.\"* and *\"I'm sorry about the trouble. Let me check your account.\"* — giving them an empathy score (0.83) well above the dataset median for agents who scored 0.5. They acknowledged urgency and kept a tone of care throughout the 12-turn exchange.\n\n**Concerns:** Despite the empathetic tone, the conversation was neither resolved nor de-escalated. The customer's sentiment arc barely moved: –0.6 → –0.7 → –0.6 → –0.6 → –0.3 → –0.3. The final agent turn offered a *refund* for what was originally an API issue — a misaligned solution that likely explains the lack of resolution. The customer also repeatedly expressed urgency in Hindi (\"Thoda jaldi please, flight in 2 hours.\") which wasn't explicitly acknowledged in kind. Overall, AgentTVAX is empathetic but struggled to translate warmth into a correct technical outcome.",
+      "evidence_count": 3,
       "tools_used": [
-        "query_agents",
+        "query_conversations",
         "query_conversations",
         "query_agents",
-        "get_conversation"
+        "get_conversation",
+        "get_trajectory"
       ],
-      "latency_s": 28.37,
+      "latency_s": 43.94,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -505,15 +492,12 @@
       "coverage_missed": [],
       "evidence_pass": true,
       "grounding": {
-        "grounding_score": 0.85,
-        "supported_claim_count": 11,
-        "unsupported_claim_count": 2,
+        "grounding_score": 1.0,
+        "supported_claim_count": 14,
+        "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
-        "ungrounded_claim_examples": [
-          "timeline inconsistencies in the turns",
-          "may not have addressed the root API problem"
-        ],
-        "one_line_judgment": "Most substantive claims are grounded by tool calls or quotes; ungrounded claims are interpretive observations about timeline inconsistencies and API problem alignment."
+        "ungrounded_claim_examples": [],
+        "one_line_judgment": "All substantive claims are grounded: aggregate metrics by tool calls (1 conversation, empathy 0.83, sentiment -0.52, resolved/escalated status, topic, date range, customer ID) and conversation-specific details by evidence quotes (empathetic phrasing, customer sentiment arc, Hindi phrase, refund solution)."
       },
       "status": "pass",
       "error": null
@@ -523,14 +507,15 @@
       "category": "edge_case",
       "language": "en",
       "question": "Find a billing or refund conversation that escalated but was not resolved.\nQuote the moment things went wrong.",
-      "answer": "Conversation **C0010656** (agent AgentHQYS, 5–9 Nov 2025) is a billing/refund case that escalated and was never resolved, finishing with an overall customer sentiment of **–0.54** — the lowest in its category.\n\nThe customer opened with a refund complaint and received a polite but generic holding response. Things broke down decisively at **Turn 2**, when the customer explicitly demanded escalation (\"Still not fixed. Can you escalate?\") — the single most negative turn in the conversation (sentiment score –0.7). Instead of actioning the escalation request, the agent replied with a passive \"Main abhi verify kar rahi/raha hoon, kindly wait\" (Turn 3), effectively ignoring the escalation ask. The urgency then compounded: the customer stated twice that they had a flight in 2 hours (\"Thoda jaldi please, flight in 2 hours\"), but the agent continued with boilerplate acknowledgements and even closed with an irrelevant delivery-status update (\"The order is out for delivery. Expected by tomorrow evening.\"), which had nothing to do with the refund issue. The conversation ended without resolution.\n\nThe critical failure is a double miss: the agent neither acted on the escalation request nor acknowledged the customer's time-sensitive urgency, leaving the customer stranded with an unresolved refund and a looming departure.",
+      "answer": "**Conversation C0010656** is a billing/refunds case from November 2025 that escalated (escalation_flag = 1) and was never resolved (resolution_flag = 0), with the most negative overall customer sentiment in its cohort (−0.54).\n\n**What went wrong:** The customer opened with a refund complaint (sentiment −0.5) and, after receiving only a generic apology with no concrete action, immediately demanded escalation at turn 2 — the sharpest sentiment drop in the conversation (−0.7). The agent's response was a passive *\"Main abhi verify kar rahi/raha hoon, kindly wait\"* (Hindi: \"I'm verifying right now, please wait\"), which did nothing to address the urgency. The customer then revealed they had a flight in 2 hours, repeating the urgency plea twice, yet the agent continued to offer boilerplate status updates and even concluded with an irrelevant delivery-order message — completely disconnected from the refund issue.\n\n**The core failure** was the agent's inability to either action the refund quickly or hand off to someone who could, leaving an increasingly urgent customer stuck in a loop of non-answers until the conversation ended unresolved.",
       "evidence_count": 3,
       "tools_used": [
         "query_conversations",
         "semantic_search",
-        "get_conversation"
+        "get_conversation",
+        "get_trajectory"
       ],
-      "latency_s": 44.55,
+      "latency_s": 36.61,
       "tool_selection_pass": true,
       "coverage": 1.0,
       "coverage_matched": [
@@ -541,11 +526,11 @@
       "evidence_pass": true,
       "grounding": {
         "grounding_score": 1.0,
-        "supported_claim_count": 11,
+        "supported_claim_count": 7,
         "unsupported_claim_count": 0,
         "irrelevant_evidence_count": 0,
         "ungrounded_claim_examples": [],
-        "one_line_judgment": "All substantive claims are grounded: conversation-selection claims (escalated, unresolved billing/refund) supported by query tool calls; specific turn-level claims and verbatim phrasings all supported by matching evidence quotes."
+        "one_line_judgment": "Every substantive claim is grounded: aggregate case identification via query_conversations and semantic_search, conversation-specific details via get_conversation and get_trajectory, and all pivotal moments via direct evidence quotes."
       },
       "status": "pass",
       "error": null

@@ -233,26 +233,9 @@ def section_dataset_handling(doc, stats, tax_doc):
       "Key facts about the data, and how each one informs the design:"
     )
     Bullet(doc,
-      "Only ~426 distinct cleaned sentences exist across 42,000 turns — "
-      "so we label each distinct sentence once and copy the labels onto "
-      "every matching turn, ~100× cheaper than labelling each turn "
-      "separately."
-    )
-    Bullet(doc,
       "Per-turn timestamps are noisy (not monotonic within a "
       "conversation) — so we use the turn index column for ordering and "
       "the earliest timestamp as the conversation's start time."
-    )
-    Bullet(doc,
-      "Only the cleaned leading sentence of each turn carries signal; "
-      "the trailing characters are random gibberish — so cleaning is just "
-      "'keep everything up to the last sentence-ending punctuation', no "
-      "fancy parsing needed."
-    )
-    Bullet(doc,
-      "Each customer maps to exactly one conversation — so customer-level "
-      "views and conversation-level views are equivalent; no extra "
-      "deduplication needed."
     )
     Bullet(doc,
       f"Most agents only appear in one conversation "
@@ -324,7 +307,6 @@ def section_dataset_handling(doc, stats, tax_doc):
     Bullet(doc,
       "Agent empathy (agent turns only): "
       + ", ".join(f"{k}={v:,}" for k, v in stats["empathy_agent_only"].items())
-      + " — 0 dismissive agent turns reflects the uniformly polite synthetic data."
     )
 
     H2(doc, "2.6 Preprocessed database schema")
@@ -356,11 +338,11 @@ def section_system_design(doc):
     P(doc,
       "Two clearly separated parts: a preprocessing pipeline that runs once "
       "offline to turn the raw CSV into labelled, searchable data, and an "
-      "online serving path that uses an AI agent to answer questions over "
+      "actual systsem that uses an AI agent to answer questions over "
       "that data."
     )
 
-    H2(doc, "3.1 Preprocessing pipeline (offline, one-shot)")
+    H2(doc, "3.1 Preprocessing pipeline (offline, one-time run)")
     Code(doc,
         "         ┌────────────────────────────┐\n"
         "         │  Raw CSV (42k turns)       │\n"
@@ -392,14 +374,7 @@ def section_system_design(doc):
         "   │ (SQLite)   │           │  embeddings) │\n"
         "   └────────────┘           └──────────────┘"
     )
-    P(doc, "Important pieces (high level):")
-    Bullet(doc, "The data cleaner — strips the synthetic gibberish from each turn.")
-    Bullet(doc, "The labeller — sends each distinct sentence once to a fast AI model and copies the labels onto every matching turn.")
-    Bullet(doc, "The topic extractor — recognises which product / service the customer is calling about, then groups those into a small set of analyst-friendly categories.")
-    Bullet(doc, "The rollups — produce ready-to-query views per conversation and per agent.")
-    Bullet(doc, "The vector-store seeder — embeds each conversation using a multilingual model so semantic search works in both English and Hindi/Hinglish.")
-
-    H2(doc, "3.2 Online serving (per analyst question)")
+    H2(doc, "3.2 Actual system (per analyst question)")
     Code(doc,
         "         ┌────────────────────────────┐\n"
         "         │  Analyst types a question  │\n"
@@ -434,12 +409,6 @@ def section_system_design(doc):
         "         │  reasoning + uncertainty   │\n"
         "         └────────────────────────────┘"
     )
-    P(doc, "Important pieces (high level):")
-    Bullet(doc, "The chat UI — where the analyst types their question and sees the answer with evidence cards.")
-    Bullet(doc, "The web API — accepts a question, returns the structured answer; can also be called from scripts or other systems.")
-    Bullet(doc, "The agent — the brain that decides what tools to call to answer the question.")
-    Bullet(doc, "The tools — the agent's hands; the six things the agent is allowed to ask the data for.")
-    Bullet(doc, "Session memory — short-term context so follow-up questions can refer back to earlier answers within the same session.")
 
 
 def section_agent_flow(doc):
@@ -471,34 +440,6 @@ def section_agent_flow(doc):
         "Save turn to session memory → return AnswerEnvelope to caller"
     )
 
-    H2(doc, "Responsibilities and data flow")
-    P(doc,
-      "The agent and its tools have clearly separated jobs and a typed "
-      "boundary between them:"
-    )
-    Bullet(doc,
-      "Agent — given the analyst's question, decides which tools to call "
-      "in what order, gathers their results in its working context, then "
-      "writes the final structured answer. It cannot read or write the "
-      "database directly; it can only ask via the six tools."
-    )
-    Bullet(doc,
-      "Tools — read-only, side-effect-free functions that each answer one "
-      "kind of data question (aggregate, semantic search, single-"
-      "conversation lookup, etc.). Each tool has a typed input schema "
-      "and a typed output schema; the agent must conform to the input "
-      "schema and gets back results in the documented output shape."
-    )
-    Bullet(doc,
-      "Return envelope (what the caller gets back) — the agent's final "
-      "response is always a structured AnswerEnvelope with fields: "
-      "`answer` (prose, 1-3 paragraphs), `evidence` (list of "
-      "{conv_id, quote, relevance, similarity}), `tool_calls` (the trace "
-      "of which tools were called with what arguments, for transparency), "
-      "`reasoning_brief` (one sentence describing how the answer was "
-      "reached), and `uncertainty` (optional caveat)."
-    )
-
     H2(doc, "The six tools")
     P(doc,
       "Each tool's input format, output format, and a representative "
@@ -510,19 +451,6 @@ def section_agent_flow(doc):
     P(doc, "query_conversations", bold=True)
     P(doc, "Counts, ranks, or averages over the conversations table. Either returns aggregate rows (when group_by is set) or raw conversation rows.")
     Code(doc,
-        "Input:\n"
-        "  {month?, date_from?, date_to?, topic?, sentiment_min?,\n"
-        "   sentiment_max?, escalation_flag?, resolution_flag?, language?,\n"
-        "   agent_name?, group_by?, metrics?, order_by?, order?, limit?}\n"
-        "\n"
-        "Output:\n"
-        "  list of rows. If group_by set:\n"
-        "    [{group_key, count, avg_sentiment?, avg_empathy?,\n"
-        "      escalation_rate?, resolution_rate?}, ...]\n"
-        "  Otherwise:\n"
-        "    [{conv_id, customer_name, agent_name, start_ts, end_ts,\n"
-        "      turn_count, topic, customer_sentiment_overall, ...}]\n"
-        "\n"
         "Example call:\n"
         "  query_conversations(month='2025-11', sentiment_max=-0.1,\n"
         "                      group_by='topic',\n"
@@ -539,16 +467,6 @@ def section_agent_flow(doc):
     P(doc, "query_agents", bold=True)
     P(doc, "Ranks and filters across the per-agent table.")
     Code(doc,
-        "Input:\n"
-        "  {min_conv_count?, sort_by?, order?, limit?}\n"
-        "    sort_by ∈ {empathy_mean, resolution_rate,\n"
-        "               avg_customer_sentiment, escalation_rate, conv_count}\n"
-        "\n"
-        "Output:\n"
-        "  [{agent_name, conv_count, avg_customer_sentiment,\n"
-        "    empathy_mean, resolution_rate, escalation_rate,\n"
-        "    top_topics}, ...]\n"
-        "\n"
         "Example call:\n"
         "  query_agents(min_conv_count=2, sort_by='empathy_mean',\n"
         "               order='asc', limit=3)\n"
@@ -563,15 +481,6 @@ def section_agent_flow(doc):
     P(doc, "semantic_search", bold=True)
     P(doc, "Returns conversations whose meaning matches the query, multilingual.")
     Code(doc,
-        "Input:\n"
-        "  {query, k?, topic?, agent_name?, language?,\n"
-        "   sentiment_min?, sentiment_max?, escalation_flag?}\n"
-        "\n"
-        "Output:\n"
-        "  [{conv_id, similarity, document_excerpt, topic,\n"
-        "    agent_name, customer_sentiment_overall,\n"
-        "    language, escalation_flag}, ...]\n"
-        "\n"
         "Example call:\n"
         "  semantic_search(query='customer feeling rushed about travel',\n"
         "                  k=3)\n"
@@ -586,16 +495,6 @@ def section_agent_flow(doc):
     P(doc, "get_trajectory", bold=True)
     P(doc, "Per-turn sentiment arc + intent / empathy for one conversation.")
     Code(doc,
-        "Input:\n"
-        "  {conv_id}\n"
-        "\n"
-        "Output:\n"
-        "  {conv_id, topic, customer_sentiment_overall,\n"
-        "   resolution_flag, escalation_flag,\n"
-        "   customer_arc:[sentiment_scores_in_order],\n"
-        "   turns:[{turn_index, role, sentiment_label, sentiment_score,\n"
-        "           intent, empathy_signal, text_clean}, ...]}\n"
-        "\n"
         "Example call:\n"
         "  get_trajectory(conv_id='C0009233')\n"
         "Example output:\n"
@@ -612,18 +511,6 @@ def section_agent_flow(doc):
     P(doc, "get_conversation", bold=True)
     P(doc, "Full transcript of one conversation for verbatim quoting.")
     Code(doc,
-        "Input:\n"
-        "  {conv_id, include_translation?}\n"
-        "\n"
-        "Output:\n"
-        "  {conv_id, customer_name, agent_name, start_ts, end_ts,\n"
-        "   topic, customer_sentiment_overall,\n"
-        "   resolution_flag, escalation_flag,\n"
-        "   turns:[{turn_index, role, timestamp, text_clean,\n"
-        "           text_clean_en?, language, sentiment_label,\n"
-        "           sentiment_score, intent, empathy_signal,\n"
-        "           is_escalation, contains_pii}, ...]}\n"
-        "\n"
         "Example call:\n"
         "  get_conversation(conv_id='C0003634', include_translation=True)\n"
         "Example output:\n"
@@ -642,13 +529,6 @@ def section_agent_flow(doc):
     P(doc, "list_topics", bold=True)
     P(doc, "The 15 topic categories with how many conversations fall under each.")
     Code(doc,
-        "Input:\n"
-        "  {with_examples?}\n"
-        "\n"
-        "Output:\n"
-        "  [{id, label, description, count_in_dataset,\n"
-        "    example_conv_id?}, ...]\n"
-        "\n"
         "Example call:\n"
         "  list_topics(with_examples=False)\n"
         "Example output:\n"
@@ -681,11 +561,9 @@ def section_models_and_tools(doc):
          "Fastest viable chat surface. st.chat_message for history, st.sidebar for sample questions + session controls."],
     ]
     Table(doc, ["Component", "Role", "Why"], rows, col_widths=[1.7, 1.6, 3.0])
-    H2(doc, "Cost & latency posture")
+    H2(doc, "Cost")
     Bullet(doc, "Offline pipeline: one-time, < $0.50 of Anthropic spend on a fresh build (426 Haiku classifications + 1 Sonnet taxonomy call).")
     Bullet(doc, "Online: $0.02–$0.05 per question depending on tool-call count (Q4-style multi-tool agent-coaching questions are the upper bound).")
-    Bullet(doc, "Latency: typically 10–60s end-to-end (planner + tools + synthesis); p95 = 60s on the eval set. This is the deliberate trade-off versus single-prompt response time — the agent must compose multi-step reasoning.")
-    Bullet(doc, "Credentials policy: ANTHROPIC_API_KEY loaded from .env via python-dotenv; .env is gitignored; .env.example documents every required variable with placeholders only.")
 
 
 def section_evaluation(doc, eval_data):
@@ -703,15 +581,6 @@ def section_evaluation(doc, eval_data):
       "tools were called, keyword coverage in the answer, evidence count, "
       "grounding (LLM-as-judge), and latency. A question passes the first "
       "three; grounding is reported as an independent column."
-    )
-    P(doc,
-      f"Grounding grader: {eval_data.get('grader_model','Haiku')} with a "
-      "structured-output tool that returns supported_claim_count, "
-      "unsupported_claim_count, irrelevant_evidence_count, and ungrounded "
-      "examples. Rubric explicitly distinguishes aggregate claims (grounded "
-      "by SQL tool calls; quotes not required) from conversation-specific "
-      "claims (require quote support). Pure-aggregation answers with no "
-      "quotes correctly score 1.0."
     )
     H2(doc, "6.2 Overall results")
     rows = [
@@ -748,51 +617,33 @@ def section_evaluation(doc, eval_data):
     Table(doc, ["Language", "Pass rate"], rows, col_widths=[2.0, 2.0])
 
     H2(doc, "6.5 Representative successes")
+    q04 = next(r for r in eval_data["results"] if r["id"] == "q04_agents_low_empathy")
+    q04_tools = len(q04["tools_used"])
+    q04_gnd = q04["grounding"]["grounding_score"] if q04["grounding"] else "—"
+    # Extract first three agent names mentioned in the answer (bold **AgentXXXX** pattern)
+    import re
+    agent_names = re.findall(r'\*\*(Agent[A-Z]+)\b', q04["answer"])
+    agent_str = ", ".join(list(dict.fromkeys(agent_names))[:3]) or "multiple agents"
     Bullet(doc,
-      "Q06 (trajectory of Hinglish conversation C0009233) — single get_trajectory "
-      "call yielded a turn-by-turn narrative identifying turn 14 as the inflection "
-      "point (sentiment +0.6 momentary spike) followed by a relapse at turn 16, "
-      "with verbatim Hinglish quotes preserved in the evidence."
-    )
-    Bullet(doc,
-      "Q04 (agents needing coaching) — composed 11 tool calls including "
-      "query_agents, semantic_search, and two get_conversation drill-downs to "
-      "name three specific agents (AgentVYJS, AgentTXPF, AgentTVAX) with "
-      "verbatim Hinglish and English quotes from their conversations and four "
-      "actionable coaching themes. Grounding 1.00."
-    )
-    Bullet(doc,
-      "Q10 (Hinglish app-crash retrieval) — English query surfaced three "
-      "Hinglish 'App crash ho rahi hai while using X' conversations via the "
-      "multilingual embedding, confirming cross-language retrieval works "
-      "without pre-translation."
+      f"Q04 (agents needing coaching) — composed {q04_tools} tool calls including "
+      "query_agents and get_conversation drill-downs to "
+      f"name three specific agents ({agent_str}) with "
+      "verbatim Hinglish and English quotes from their conversations and "
+      f"actionable coaching themes. Grounding {q04_gnd:.2f}."
     )
     H2(doc, "6.6 Representative failures / weaknesses")
+    q08 = next(r for r in eval_data["results"] if r["id"] == "q08_leadership_priorities")
+    q08_gnd = q08["grounding"]["grounding_score"] if q08["grounding"] else "—"
     Bullet(doc,
-      "Q06 grounding 0.65 — grader rubric edge case. The Haiku judge "
-      "penalised specific turn-level sentiment values that came from "
-      "get_trajectory because the rubric prioritises quote-grounding over "
-      "tool-call-grounding for non-aggregate numeric claims. Fix: extend "
-      "the rubric to credit get_trajectory for turn-level numerical claims "
-      "the way it credits query_conversations for aggregate-level claims."
-    )
-    Bullet(doc,
-      "Q08 grounding 0.75 — the agent included interpretive prose "
-      "(\"login lockouts are a product/ops gap\") that goes beyond what tools "
-      "support. Behavioural pattern worth tightening with a stronger "
-      "system-prompt rule against editorial leaps."
-    )
-    Bullet(doc,
-      "Q09 grounding 0.75 — Financial Products and Promotions stats "
-      "appeared in the answer without matching SQL row in the trace. "
-      "Possible numerical hallucination; deserves a manual spot-check on "
-      "the next iteration."
+      f"Q08 grounding {q08_gnd:.2f} — the agent included interpretive prose "
+      "(\"systemic process or tooling gaps\") that goes beyond what tools "
+      "support."
     )
     H2(doc, "6.7 Latency and consistency")
     P(doc,
       f"Mean latency {summary['mean_latency_s']}s, p95 {summary['p95_latency_s']}s. "
       "Latency scales with tool-call count: aggregation-only questions land at "
-      "10–15s, Q4-style multi-step evidence-seeking questions hit 60–75s. "
+      "10–15s, Q4-style multi-step evidence-seeking questions hit 40–50s. "
       "All 15 questions returned a valid AnswerEnvelope with no schema "
       "violations across the run."
     )
@@ -816,8 +667,7 @@ def section_bonus_extensions(doc):
     P(doc,
       "The agent decides on its own — it reaches for semantic search "
       "whenever the analyst asks for examples, evidence, or similar cases. "
-      "In the evaluation set this happened on 9 of 15 questions, most "
-      "heavily on agent-coaching and Hindi/Hinglish queries."
+      "In the evaluation set this happened on 9 of 15 questions."
     )
 
     P(doc, "What evidence is returned:", bold=True)
@@ -832,9 +682,7 @@ def section_bonus_extensions(doc):
     P(doc,
       "It lifts answers from generic statistics to cited, concrete "
       "examples — real conversations over statistical disclaimers. In the "
-      "eval, 9 of 15 answers include 3+ evidence quotes, and every "
-      "Hindi-language question is answered with at least one original-"
-      "language quote."
+      "eval, 9 of 15 answers include 3+ evidence quotes."
     )
 
     H2(doc, "7.2 Specialised LLM for offline labelling")
@@ -844,8 +692,7 @@ def section_bonus_extensions(doc):
       "We use an LLM to do topic extraction, sentiment analysis, intent "
       "detection, empathy detection, and language detection on every turn. "
       "Classical ML classifiers would need labelled training data we don't "
-      "have and would struggle with the bilingual English + Hindi/Hinglish "
-      "mix; an LLM handles both out of the box."
+      "have,"
     )
 
     P(doc, "How it fits the flow:", bold=True)
@@ -857,49 +704,13 @@ def section_bonus_extensions(doc):
       "questions in seconds."
     )
 
-    P(doc, "How its usefulness was evaluated:", bold=True)
-    P(doc,
-      "The labels are checked indirectly by the evaluation set: questions "
-      "like \"topics with most negative sentiment last month\" or \"agents "
-      "with lowest empathy\" only return the right answers if the underlying "
-      "labels are correct. All 15 evaluation questions pass, which "
-      "indicates the labels are reliable enough for analyst use."
-    )
-
     H2(doc, "7.3 Memory integration")
-
-    P(doc, "What is stored:", bold=True)
     P(doc,
-      "Each question and its full structured answer are stored in a session-"
-      "scoped table, keyed by session id and turn index. Stored content is "
-      "PII-redacted before persistence (emails, phone numbers, card-like "
-      "numbers replaced with placeholders)."
-    )
-
-    P(doc, "How it is retrieved:", bold=True)
-    P(doc,
-      "At the start of every new question, the agent loads the last few "
-      "turns of the current session and prepends them as prior context "
-      "before reading the new question. This is automatic — the analyst "
-      "doesn't have to opt in."
-    )
-
-    P(doc, "How it affects later responses:", bold=True)
-    P(doc,
-      "Follow-up questions can refer back to earlier ones without the "
-      "analyst re-typing context — for example, asking about \"the agent "
-      "you just mentioned\" works because the prior answer is in the agent's "
-      "context. The agent can also reuse prior evidence instead of "
-      "re-fetching it."
-    )
-
-    P(doc, "Reliability and privacy considerations:", bold=True)
-    P(doc,
-      "Memory is scoped per session so one analyst's questions never bleed "
-      "into another's, and rows expire after 24 hours so old context "
-      "doesn't accumulate. Synthetic customer/agent identifiers from the "
-      "dataset are intentionally not redacted because they are not real "
-      "PII and follow-up continuity needs them."
+      "Each question and its structured answer are stored in a session-scoped "
+      "SQLite table (PII-redacted, 24h TTL). At the start of every new "
+      "question the last few turns are prepended as prior context, enabling "
+      "natural follow-up questions — e.g. 'tell me more about that agent' "
+      "works without the analyst re-typing the agent's name."
     )
 
 
@@ -946,16 +757,6 @@ def section_limitations_and_improvements(doc):
       "Authentication and per-analyst rate limiting are also missing."
     )
 
-    P(doc, "4. Add an online critic to push grounding higher.", bold=True)
-    P(doc,
-      "Today one agent gathers data and writes the answer in one loop. A "
-      "natural next step is to add a critic that reads the final answer "
-      "plus its evidence and decides whether the grounding is good enough; "
-      "if not, it asks the planner to retrieve more evidence and rewrite. "
-      "This is the cheapest single change that would push the system from "
-      "single-agent to a clear multi-agent workflow, and it directly "
-      "targets the few evaluation questions where grounding was weakest."
-    )
 
 
 def section_appendix(doc):
