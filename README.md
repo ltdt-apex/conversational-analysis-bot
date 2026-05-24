@@ -13,9 +13,9 @@ Dockerfile with only the dependencies it needs:
 
 | Service | Dockerfile | Port | Role |
 |---|---|---|---|
-| `prepare` | `preprocess/Dockerfile` | — | One-shot offline preprocessing |
-| `api` | `backend/Dockerfile` | 8000 | FastAPI serving the agent loop |
-| `ui` | `ui/Dockerfile` | 8501 | Streamlit chat (slim — no torch/chromadb) |
+| `prepare` | `preprocess/Dockerfile` | — | One-time offline preprocessing |
+| `api` | `backend/Dockerfile` | 8000 | Backend serving the agent loop |
+| `ui` | `ui/Dockerfile` | 8501 | frontend chat interface |
 
 The preprocess step take around 5 minute to generate labels (e.g. sentiment score) for fast data lookup in real step.
 
